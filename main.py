@@ -279,4 +279,10 @@ async def on_voice_state_update(member, before, after):
 with open("code.py", "r") as f:
     token = f.read().strip()
 
-await bot.start(token) # не менять!
+
+keep_alive()
+
+async def main():
+    await bot.start(token)
+
+asyncio.run(main())
