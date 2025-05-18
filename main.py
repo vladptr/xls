@@ -1,4 +1,3 @@
-
 import discord
 from discord.ext import commands
 from discord.ui import View, Button
@@ -102,18 +101,14 @@ async def skip(ctx):
 @bot.command()
 async def queue(ctx):
     if music_queue:
-        await ctx.send("Очередь:")
-" + "
-".join(music_queue))
+        await ctx.send("Очередь:\n" + "\n".join(music_queue))
     else:
         await ctx.send("Очередь пуста.")
 
 @bot.command()
 async def playlist(ctx):
     if music_queue:
-        await ctx.send("Плейлист:
-" + "
-".join(music_queue))
+        await ctx.send("Плейлист:\n" + "\n".join(music_queue))
     else:
         await ctx.send("Плейлист пуст.")
 
@@ -186,8 +181,7 @@ class LimitButton(Button):
             new_name = limit_name_mapping[base_name][self.label]
             await channel.edit(name=new_name)
             await interaction.response.send_message(
-                f"Установлен лимит: **{limit}** участников
-Название канала изменено на: **{new_name}**",
+                f"Установлен лимит: **{limit}** участников\nНазвание канала изменено на: **{new_name}**",
                 ephemeral=True
             )
         else:
@@ -282,9 +276,7 @@ async def on_voice_state_update(member, before, after):
             view = LimitSelectViewWithSearch(member.id, new_channel.id)
             await new_channel.send(f"{member.mention}, выбери лимит участников для **{new_channel.name}**:", view=view)
 
-with open("code.env", "r") as f:
+with open("code.py", "r") as f:
     token = f.read().strip()
 
 await bot.start(token) # не менять!
-
-
