@@ -6,6 +6,8 @@ import asyncio
 from dotenv import load_dotenv
 import os
 
+from webserver import keep_alive
+
 intents = discord.Intents.default()
 intents.guilds = True
 intents.members = True
