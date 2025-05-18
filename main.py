@@ -280,10 +280,15 @@ async def on_voice_state_update(member, before, after):
 
 token = os.getenv("TOKEN")
 
+if not token:
+    print("❌ TOKEN is missing!")
+else:
+    print("✅ Token loaded!")
 
-keep_alive()
 
 async def main():
+    keep_alive()
+
     await bot.start(token)
 
 asyncio.run(main())
