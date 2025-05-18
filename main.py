@@ -69,6 +69,14 @@ async def play_next(ctx):
     else:
         await asyncio.sleep(1)
 
+@bot.event
+async def on_ready():
+    print(f"✅ Logged in as {bot.user}")
+
+@bot.command()
+async def ping(ctx):
+    await ctx.send("🏓 Pong!")
+    
 @bot.command()
 async def join(ctx):
     if ctx.author.voice:
