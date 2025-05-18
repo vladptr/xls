@@ -102,7 +102,7 @@ async def skip(ctx):
 @bot.command()
 async def queue(ctx):
     if music_queue:
-        await ctx.send("Очередь:
+        await ctx.send("Очередь:)
 " + "
 ".join(music_queue))
     else:
