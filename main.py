@@ -278,12 +278,12 @@ async def on_voice_state_update(member, before, after):
             view = LimitSelectViewWithSearch(member.id, new_channel.id)
             await new_channel.send(f"{member.mention}, выбери лимит участников для **{new_channel.name}**:", view=view)
 
-token = os.getenv("TOKEN")
+#token = os.getenv("TOKEN")
 
 
 keep_alive()
 
 async def main():
-    await bot.start(token)
+    await bot.start("MTM3MTkyNDEyOTg0NjAwNTgxMQ.GLygfq.B2aVVYjYYqRDHMiO7FuaoKA1ncUpDdR1khRVzw")
 
 asyncio.run(main())
