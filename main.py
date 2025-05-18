@@ -278,8 +278,7 @@ async def on_voice_state_update(member, before, after):
             view = LimitSelectViewWithSearch(member.id, new_channel.id)
             await new_channel.send(f"{member.mention}, выбери лимит участников для **{new_channel.name}**:", view=view)
 
-with open("code.env", "r") as f:
-    token = f.read().strip()
+token = os.getenv("TOKEN")
 
 
 keep_alive()
