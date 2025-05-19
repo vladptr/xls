@@ -279,7 +279,7 @@ async def on_voice_state_update(member, before, after):
         created_channels[new_channel.id] = member.id
         channel_bases[new_channel.id] = base_name
 
-        if conf["base"] == "Кастом игра":
+        if conf["base"] == "🎮・Кастом игра":
             view = GameSelectView(member.id, new_channel.id)
             await new_channel.send(f"{member.mention}, выбери игру для **{new_channel.name}**:", view=view)
         elif conf["base"] in limit_name_mapping:
