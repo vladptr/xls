@@ -232,7 +232,9 @@ class SearchButton(Button):
             else:
                 msg = f"+общение <@&1159121098965786634> <#{voice_channel.id}>"
 
-        await text_channel.send(msg)
+        sent_message = await text_channel.send(msg)
+await asyncio.sleep(10)  # 15 минут ожидания
+await sent_message.delete()
         await interaction.response.send_message("Сообщение отправлено в канал 'поиск'.", ephemeral=True)
 
 
