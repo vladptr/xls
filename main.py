@@ -75,7 +75,7 @@ async def on_ready():
 
 @bot.command()
 async def ping(ctx):
-    await ctx.send("🏓 Pong!")
+    await ctx.send("пшл нх")
     
 @bot.command()
 async def join(ctx):
@@ -214,7 +214,7 @@ class SearchButton(Button):
             await interaction.response.send_message("Голосовой канал не найден!", ephemeral=True)
             return
 
-        text_channel = discord.utils.get(guild.text_channels, name="поиск")
+        text_channel = discord.utils.get(guild.text_channels, name="🔍 ・поиск тимы")
         if not text_channel:
             await interaction.response.send_message("Текстовый канал 'поиск' не найден!", ephemeral=True)
             return
@@ -224,13 +224,13 @@ class SearchButton(Button):
 
         # Cообщение набора
         if user_limit in [6, 99]:
-            msg = f"+очередь <@&1372898116877160519> <#{voice_channel.id}>" # 1372898116877160519 id роли которую должно тегать в поиске тимы (айдишка 1159121098965786634 с сервера), можно заменить на любую другую роль
+            msg = f"+очередь на замену тимейта <@&1159121098965786634> <#{voice_channel.id}>" # 1372898116877160519 id роли которую должно тегать в поиске тимы (айдишка 1159121098965786634 с сервера), можно заменить на любую другую роль
         else:
             missing = user_limit - member_count
             if missing > 0:
-                msg = f"+{missing} <@&1372898116877160519> <#{voice_channel.id}>"
+                msg = f"+{missing} <@&1159121098965786634> <#{voice_channel.id}>"
             else:
-                msg = f"+общение <@&1372898116877160519> <#{voice_channel.id}>"
+                msg = f"+общение <@&1159121098965786634> <#{voice_channel.id}>"
 
         await text_channel.send(msg)
         await interaction.response.send_message("Сообщение отправлено в канал 'поиск'.", ephemeral=True)
