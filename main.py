@@ -10,11 +10,26 @@ from dotenv import load_dotenv
 import os
 import nacl
 
-from webserver import keep_alive
+#from webserver import keep_alive
 
 setup_messages = {}
 channel_locks = {}
 
+
+intents = discord.Intents.default()
+intents.guilds = True
+intents.members = True
+intents.voice_states = True
+intents.message_content = True
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Переменные для музыки
+music_queue = []
+repeat_mode = False
+
+YDL_OPTIONS = {'format': 'bestaudio'}
+FFMPEG_OPTIONS = {'options': '-vn'}
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -334,8 +349,6 @@ async def on_voice_state_update(member, before, after):
 
     view = RoomSetupView(member.id, new_channel.id, mode)
     msg = await new_channel.send(f"{member.mention}, настройте комнату:", view=view)
-    setup_messages[new_channel.id] = msg
-
 
 token = os.getenv("TOKEN")
 
@@ -344,8 +357,10 @@ if not token:
 else:
     print("✅ Token loaded!")
 
+
 async def main():
     keep_alive()
     await bot.start(token)
 
 asyncio.run(main())
+#await bot.start("")
