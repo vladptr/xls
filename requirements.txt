@@ -6,3 +6,5 @@ PyNaCl
 ffmpeg-python
 ffmpeg
 yt-dlp
+random
+dotenv
