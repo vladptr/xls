@@ -13,6 +13,7 @@ import nacl
 from webserver import keep_alive
 
 setup_messages = {}
+channel_locks = {}
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -225,6 +226,11 @@ class RoomSetupView(View):
         self.add_item(RoomTypeSelect(user_id, channel_id, mode))
         self.add_item(PlayerCountSelect(user_id, channel_id, mode))
 
+async def get_channel_lock(channel_id):
+    if channel_id not in channel_locks:
+        channel_locks[channel_id] = asyncio.Lock()
+    return channel_locks[channel_id]
+
 @bot.event
 async def on_voice_state_update(member, before, after):
     
@@ -239,9 +245,11 @@ async def on_voice_state_update(member, before, after):
 
     #////////////////////////
     if before.channel and before.channel.id in created_channels:
-        owner_id = created_channels[before.channel.id]
+        lock = await get_channel_lock(before.channel.id)
+        async with lock:
+          owner_id = created_channels[before.channel.id]
         # Если вышел текущий владелец комнаты
-        if member.id == owner_id:
+          if member.id == owner_id:
             members = before.channel.members
             if len(members) > 0:
                 # Выбираем нового владельца случайно
@@ -289,7 +297,6 @@ async def on_voice_state_update(member, before, after):
                 channel_bases.pop(before.channel.id, None)
                 setup_messages.pop(before.channel.id, None)
                 print(f"Удалён пустой канал (после ухода владельца): {before.channel.name}")
-
     #//////////////////////////////////////////////////////
 
     if after.channel and after.channel.name in TRIGGER_CHANNELS:
