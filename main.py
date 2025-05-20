@@ -14,7 +14,7 @@ from webserver import keep_alive
 
 setup_messages = {}
 channel_locks = {}
-
+room_modes = {}
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -81,10 +81,6 @@ async def on_ready():
 @bot.command()
 async def gonki(ctx):
     await ctx.send("поехали! я беру гоночную каляску ♿")
-
-@bot.command()
-async def da(ctx):
-    await ctx.send("нет")
 
 @bot.command()
 async def join(ctx):
@@ -253,56 +249,52 @@ async def get_channel_lock(channel_id):
 
 @bot.event
 async def on_voice_state_update(member, before, after):
-    
     guild = member.guild
-    if before.channel and before.channel.id in created_channels:
-        await asyncio.sleep(3)
-        if len(before.channel.members) == 0:
-            await before.channel.delete()
-            created_channels.pop(before.channel.id, None)
-            channel_bases.pop(before.channel.id, None)
-            print(f"Удалён пустой канал: {before.channel.name}")
-        
-    
 
-
-    #////////////////////////
     if before.channel and before.channel.id in created_channels:
+        await asyncio.sleep(1)  # можно оставить меньше, 3 сек много
         lock = await get_channel_lock(before.channel.id)
         async with lock:
-          owner_id = created_channels[before.channel.id]
-        # Если вышел текущий владелец комнаты
-          if member.id == owner_id:
+            owner_id = created_channels[before.channel.id]
             members = before.channel.members
-            if len(members) > 0:
-                # Выбираем нового владельца случайно
+
+            if len(members) == 0:
+                # Комната пуста — удаляем
+                await before.channel.delete()
+                created_channels.pop(before.channel.id, None)
+                channel_bases.pop(before.channel.id, None)
+                setup_messages.pop(before.channel.id, None)
+                print(f"Удалён пустой канал: {before.channel.name}")
+                room_modes.pop(before.channel.id, None)
+                return
+
+            if member.id == owner_id:
+                # Назначаем нового владельца
                 new_owner = random.choice(members)
-                # Переназначаем владельца в словаре
                 created_channels[before.channel.id] = new_owner.id
 
-                # Удаляем старое сообщение с настройками (если есть)
                 old_msg = setup_messages.get(before.channel.id)
                 if old_msg:
-                    try:
-                        await old_msg.delete()
-                    except:
-                        pass  # если уже удалено или нет прав, игнорируем
+                 try:
+                   await old_msg.delete()
+                   print("✅ Старое сообщение успешно удалено.")
+                 except discord.NotFound:
+                   print("⚠️ Сообщение уже было удалено ранее.")
+                 except Exception as e:
+                   print(f"❌ Ошибка при удалении сообщения: {e}")
+                 finally:
+                   setup_messages.pop(before.channel.id, None)
 
-                # Назначаем права новому владельцу (примерно, дай права на управление каналом)
+
                 overwrite = before.channel.overwrites_for(new_owner)
                 overwrite.manage_channels = True
                 overwrite.move_members = True
                 overwrite.connect = True
                 await before.channel.set_permissions(new_owner, overwrite=overwrite)
 
-                # Определяем mode для селектов, можно взять из channel_bases
-                base_name = channel_bases.get(before.channel.id, "")
-                if base_name == "тест кастомки":
-                    mode = "custom"
-                else:
-                    mode = "default"
+                mode = room_modes.get(before.channel.id, "default")  # ✅ Берём напрямую
 
-                # Отправляем новое сообщение с настройками и сохраняем его
+
                 view = RoomSetupView(new_owner.id, before.channel.id, mode)
                 new_msg = await before.channel.send(
                     f"Владелец комнаты вышел. Новый владелец: {new_owner.mention}\n"
@@ -310,16 +302,7 @@ async def on_voice_state_update(member, before, after):
                     view=view
                 )
                 setup_messages[before.channel.id] = new_msg
-
-               
-
-            else:
-                # Если никого нет — удалить канал и очистить словари
-                await before.channel.delete()
-                created_channels.pop(before.channel.id, None)
-                channel_bases.pop(before.channel.id, None)
-                setup_messages.pop(before.channel.id, None)
-                print(f"Удалён пустой канал (после ухода владельца): {before.channel.name}")
+                print(f"Назначен новый владелец: {new_owner.name} для канала {before.channel.name}")
 
     #//////////////////////////////////////////////////////
 
@@ -349,7 +332,7 @@ async def on_voice_state_update(member, before, after):
         mode = "custom"
     else:
         mode = "default"
-    
+    room_modes[new_channel.id] = mode 
 
     view = RoomSetupView(member.id, new_channel.id, mode)
     msg = await new_channel.send(f"{member.mention}, настройте комнату:", view=view)
