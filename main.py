@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 import os
 import nacl
 
-#from webserver import keep_alive
+from webserver import keep_alive
 
 setup_messages = {}
 channel_locks = {}
