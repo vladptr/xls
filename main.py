@@ -15,6 +15,7 @@ from webserver import keep_alive
 setup_messages = {}
 channel_locks = {}
 
+
 intents = discord.Intents.default()
 intents.guilds = True
 intents.members = True
@@ -242,6 +243,9 @@ async def on_voice_state_update(member, before, after):
             created_channels.pop(before.channel.id, None)
             channel_bases.pop(before.channel.id, None)
             print(f"Удалён пустой канал: {before.channel.name}")
+        
+    
+
 
     #////////////////////////
     if before.channel and before.channel.id in created_channels:
@@ -297,6 +301,7 @@ async def on_voice_state_update(member, before, after):
                 channel_bases.pop(before.channel.id, None)
                 setup_messages.pop(before.channel.id, None)
                 print(f"Удалён пустой канал (после ухода владельца): {before.channel.name}")
+
     #//////////////////////////////////////////////////////
 
     if after.channel and after.channel.name in TRIGGER_CHANNELS:
