@@ -8,12 +8,13 @@ import asyncio
 from dotenv import load_dotenv
 import os
 import nacl
-
+import time
 from webserver import keep_alive
 
 setup_messages = {}
 channel_locks = {}
 room_modes = {}
+last_rename_times = {} 
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -179,6 +180,21 @@ class RoomTypeSelect(Select):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("Ты не создавал эту комнату!", ephemeral=True)
             return
+
+        now = time.time()
+        last_time = last_rename_times.get(self.channel_id, 0)
+        cooldown = 660  # секунды
+
+        if now - last_time < cooldown:
+            remaining = round(cooldown - (now - last_time), 1)
+            await interaction.response.send_message(
+                f"Переименовывать можно раз в {cooldown} сек. Подождите ещё {remaining} сек. Не заёбывай бота иначе будешь послан нахуй!", ephemeral=True
+            )
+            return
+
+        # Обновляем время последнего переименования
+        last_rename_times[self.channel_id] = now
+        
         channel = interaction.guild.get_channel(self.channel_id)
         if channel:
             await channel.edit(name=self.values[0])
@@ -334,7 +350,7 @@ async def on_voice_state_update(member, before, after):
         channel_bases[new_channel.id] = base_name
 
     # Определяем mode для селектов
-    if conf["category"] == "тест кастомки":
+    if conf["category"] == "Кастомки🔴":
         mode = "custom"
     else:
         mode = "default"
