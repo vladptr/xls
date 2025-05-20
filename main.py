@@ -1,4 +1,3 @@
-
 import discord 
 from discord.ext import commands
 from discord.ui import View, Select
@@ -48,9 +47,9 @@ FFMPEG_OPTIONS = {'options': '-vn'}
 
 # Переменные для голосовых каналов
 TRIGGER_CHANNELS = {
-    "🔴・Создать ранкед руму": {"base": "🏆・Ранкед рума", "category": "Ранкед🔴"},
-    "🔴・Создать паблик руму": {"base": "🟢・Паблик рума", "category": "Паблик🔴"},
-    "🔴・Создать кастомную комнату": {"base": "🎮・Кастом игра", "category": "Кастомки🔴"}
+    "создать тест ранкед": {"base": "🟢・Ранкед рума", "category": "тест ранкед"},
+    "создать тест паблик": {"base": "🟢・Паблик рума", "category": "тест паблик"},
+    "создать тест кастомку": {"base": "🎮・Кастом игра", "category": "тест кастомки"}
 }
 
 created_channels = {}
@@ -238,7 +237,7 @@ class PlayerCountSelect(Select):
 
 class RoomSetupView(View):
     def __init__(self, user_id, channel_id, mode="default"):
-        super().__init__(timeout=50000)
+        super().__init__(timeout=300)
         self.add_item(RoomTypeSelect(user_id, channel_id, mode))
         self.add_item(PlayerCountSelect(user_id, channel_id, mode))
 
@@ -306,26 +305,33 @@ async def on_voice_state_update(member, before, after):
 
     #//////////////////////////////////////////////////////
 
+    if not after.channel or after.channel.name not in TRIGGER_CHANNELS:
+        return
+
     if after.channel and after.channel.name in TRIGGER_CHANNELS:
-      conf = TRIGGER_CHANNELS[after.channel.name]
-      category = discord.utils.get(guild.categories, name=conf["category"])
-    if not category:
-      print(f"Категория {conf['category']} не найдена!")
-      return
-   
-    existing = [ch for ch in guild.voice_channels if ch.name.startswith(conf["base"]) and ch.category == category]
-    number = 1
-    base_name = conf["base"]
-    new_name = f"{base_name} #{number}"
-    while any(ch.name == new_name for ch in existing):
-        number += 1
+        conf = TRIGGER_CHANNELS[after.channel.name]
+        category = discord.utils.get(guild.categories, name=conf["category"])
+
+        if not category:
+            print(f"Категория {conf['category']} не найдена!")
+            return
+
+        existing = [
+            ch for ch in guild.voice_channels
+            if ch.name.startswith(conf["base"]) and ch.category == category
+        ]
+        number = 1
+        base_name = conf["base"]
         new_name = f"{base_name} #{number}"
+        while any(ch.name == new_name for ch in existing):
+            number += 1
+            new_name = f"{base_name} #{number}"
 
-    new_channel = await guild.create_voice_channel(new_name, category=category)
-    await member.move_to(new_channel)
+        new_channel = await guild.create_voice_channel(new_name, category=category)
+        await member.move_to(new_channel)
 
-    created_channels[new_channel.id] = member.id
-    channel_bases[new_channel.id] = base_name
+        created_channels[new_channel.id] = member.id
+        channel_bases[new_channel.id] = base_name
 
     # Определяем mode для селектов
     if conf["category"] == "тест кастомки":
@@ -336,6 +342,8 @@ async def on_voice_state_update(member, before, after):
 
     view = RoomSetupView(member.id, new_channel.id, mode)
     msg = await new_channel.send(f"{member.mention}, настройте комнату:", view=view)
+    setup_messages[new_channel.id] = msg
+
 
 token = os.getenv("TOKEN")
 
