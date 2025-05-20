@@ -83,6 +83,10 @@ async def gonki(ctx):
     await ctx.send("поехали! я беру гоночную каляску ♿")
 
 @bot.command()
+async def da(ctx):
+    await ctx.send("нет")
+
+@bot.command()
 async def join(ctx):
     if ctx.author.voice:
         channel = ctx.author.voice.channel
