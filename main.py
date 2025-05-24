@@ -253,7 +253,7 @@ class PlayerCountSelect(Select):
 
 class RoomSetupView(View):
     def __init__(self, user_id, channel_id, mode="default"):
-        super().__init__(timeout=300)
+        super().__init__(timeout=300000)
         self.add_item(RoomTypeSelect(user_id, channel_id, mode))
         self.add_item(PlayerCountSelect(user_id, channel_id, mode))
 
