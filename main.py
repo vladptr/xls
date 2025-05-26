@@ -12,11 +12,17 @@ import time
 import sqlite3
 from datetime import datetime, timedelta
 from webserver import keep_alive
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+from matplotlib import rcParams
 
 setup_messages = {}
 channel_locks = {}
 room_modes = {}
 last_rename_times = {} 
+
+users = {}
+weeks = []
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -102,6 +108,25 @@ async def on_ready():
 @bot.command()
 async def gonki(ctx):
     await ctx.send("поехали! я беру гоночную каляску ♿")
+
+@bot.command()
+async def cleargraf(ctx):
+    global users, weeks
+    try:
+        # Очищаем локальные данные
+        users.clear()
+        weeks.clear()
+
+        # Очищаем базу данных
+        conn = sqlite3.connect("voice_stats.db")
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM weekly_voice_stats")
+        conn.commit()
+        conn.close()
+
+        await ctx.send("Все данные графика успешно удалены!")
+    except Exception as e:
+        await ctx.send(f"Произошла ошибка при очистке данных: {e}")
 #//////////////////////////////////////
 
 @bot.command()
@@ -429,7 +454,132 @@ if not token:
 else:
     print("✅ Token loaded!")
 
-#//////////////////////////////////////
+#/////////////////////////////////////////////////////
+
+async def generate_and_send_graph(bot, channel_id, cycle_number):
+    conn = sqlite3.connect("voice_stats.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT week_number, user_id, total_seconds
+        FROM weekly_voice_stats
+        WHERE cycle_number = ?
+        ORDER BY week_number, total_seconds DESC
+    """, (cycle_number,))
+    data = cursor.fetchall()
+
+    if not data:
+        print("Нет данных для графика.")
+        return
+
+    users = {}
+    weeks = set()
+    for week_number, user_id, total_seconds in data:
+        weeks.add(week_number)
+        users.setdefault(user_id, {})[week_number] = total_seconds / 3600
+
+    weeks = sorted(list(weeks))
+    user_ids = list(users.keys())
+
+    if not user_ids:
+        print("Нет пользователей для построения графика.")
+        return
+
+    rcParams['font.family'] = 'Arial'
+    rcParams['text.color'] = 'white'
+    rcParams['axes.labelcolor'] = 'white'
+    rcParams['xtick.color'] = 'white'
+    rcParams['ytick.color'] = 'white'
+
+
+    # Сначала вычисляем xmin, xmax, ymin, ymax
+    xmin = min(weeks)
+    xmax = max(weeks)
+    range_x = xmax - xmin if xmax != xmin else 1  # Защита от деления на ноль
+    xmax += range_x * 0.18  # Добавляем справа 15%
+
+    max_y = max([max(users[u].values()) for u in user_ids]) * 1.1 if user_ids else 1
+    ymin, ymax = 0, max_y
+
+    fig, ax = plt.subplots(figsize=(19.2, 10.8), dpi=100)
+    
+    background_img = mpimg.imread('backpack.jpg')
+
+    fig.patch.set_alpha(0.0)
+    fig.patch.set_facecolor('none')
+    ax.set_facecolor('none')
+
+    # Показываем фон с учетом новых лимитов
+    ax.imshow(background_img, extent=[xmin, xmax, ymin, ymax], aspect='auto', zorder=0)
+
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
+    ax.tick_params(colors='white')
+    ax.xaxis.label.set_color('white')
+    ax.yaxis.label.set_color('white')
+    ax.title.set_color('white')
+
+    user_sums = {user_id: sum(users[user_id].values()) for user_id in user_ids}
+    user_ids_sorted = sorted(user_ids, key=lambda u: user_sums[u], reverse=True)
+
+    lines = []
+    labels = []
+
+    for user_id in user_ids_sorted:
+        member = bot.get_guild(1371926685435428924).get_member(user_id)
+        member_name = member.display_name if member else f"User {user_id}"
+        times = [users[user_id].get(week, 0) for week in weeks]
+        line, = ax.plot(weeks, times, marker='o', label=member_name, zorder=1)
+        lines.append(line)
+        labels.append(member_name)
+        for week, time in zip(weeks, times):
+            if time > 0:
+                ax.text(week, time, f"{int(time)}ч {int((time % 1) * 60)}м", fontsize=8, weight='bold', color='white', zorder=2)
+
+
+
+    ax.set_xlabel("Неделя")
+    ax.set_ylabel("Время (часы)")
+    ax.set_title(f"Голосовая активность - Цикл {cycle_number}")
+
+    ax.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.1, -0.07), ncol=10, fontsize=8, frameon=False)
+
+
+    filename = f"graph_cycle_{cycle_number}.png"
+    plt.savefig(filename, bbox_inches='tight', facecolor=fig.get_facecolor())
+    plt.close()
+
+    # Отправляем в канал
+    channel = bot.get_channel(channel_id)
+    if channel:
+        with open(filename, 'rb') as f:
+            await channel.send(content=f"📊 Статистика голосовой активности за цикл {cycle_number}:", file=discord.File(f))
+    else:
+        print("Канал не найден.")
+
+    conn.close()
+
+@bot.event
+async def on_ready():
+    bot.loop.create_task(weekly_reset())
+
+#/////////////////////////////////////////////////////
+
+def init_db():
+    conn = sqlite3.connect("voice_stats.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS weekly_voice_stats (
+            cycle_number INTEGER,
+            week_number INTEGER,
+            user_id INTEGER,
+            total_seconds INTEGER
+        )
+    """)
+    conn.commit()
+    conn.close()
+#/////////////////////////////////////////////////////
 
 async def weekly_reset():
     while True:
@@ -437,26 +587,31 @@ async def weekly_reset():
         # Рассчитываем время до ближайшего понедельника 00:00
         next_monday = now + timedelta(days=(7 - now.weekday()))
         next_reset = datetime.combine(next_monday.date(), datetime.min.time())
-        wait_time =  (next_reset - now).total_seconds() #2*60
+        wait_time = (next_reset - now).total_seconds() #2*60
         await asyncio.sleep(wait_time)
+#/////////////////////////////////////////////////////
+        # Получаем текущий цикл
+        conn = sqlite3.connect("voice_stats.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(cycle_number) FROM weekly_voice_stats")
+        row = cursor.fetchone()
+        cycle_number = (row[0] or 0)
+        # Проверяем, если цикл >= 12 недель, увеличиваем номер цикла
+        cursor.execute("SELECT COUNT(DISTINCT week_number) FROM weekly_voice_stats WHERE cycle_number = ?", (cycle_number,))
+        week_count = cursor.fetchone()[0]
+        if week_count >= 12:
+            cycle_number += 1
 
-        guild = bot.guilds[0]  # Можно заменить на bot.get_guild(YOUR_GUILD_ID) для точного выбора
-        channel = guild.get_channel(LEADERBOARD_CHANNEL_ID)
-        if channel:
-            # Получаем топ-10 перед сбросом
-            cursor.execute("SELECT user_id, total_seconds FROM voice_time ORDER BY total_seconds DESC")
-            rows = cursor.fetchall()
-            if rows:
-                leaderboard_text = "**📊 Еженедельный отчет по активности в голосовых каналах:**\n"
-                for i, (user_id, total_seconds) in enumerate(rows, start=1):
-                    member = guild.get_member(user_id)
-                    name = member.display_name if member else f"User {user_id}"
-                    hours, remainder = divmod(total_seconds, 3600)
-                    minutes, seconds = divmod(remainder, 60)
-                    leaderboard_text += f"{i}. {name}: {hours}ч {minutes}м {seconds}с\n"
-                await channel.send(leaderboard_text)
-            else:
-                await channel.send("Не заходил в голосовые каналы 😢")
+        # Сохраняем текущую статистику в weekly_voice_stats
+        cursor.execute("SELECT user_id, total_seconds FROM voice_time")
+        for user_id, total_seconds in cursor.fetchall():
+            cursor.execute("INSERT INTO weekly_voice_stats (cycle_number, week_number, user_id, total_seconds) VALUES (?, ?, ?, ?)",
+                           (cycle_number, week_count + 1, user_id, total_seconds))
+        conn.commit()
+
+        # Отправляем график в канал
+        await generate_and_send_graph(bot, channel_id=1373789452463243314, cycle_number=cycle_number)
+#/////////////////////////////////////////////////////
 
         # Сброс статистики
         cursor.execute("DELETE FROM voice_time")
@@ -465,6 +620,7 @@ async def weekly_reset():
 
 @bot.event
 async def on_ready():
+    init_db()
     bot.loop.create_task(weekly_reset())
     print(f"Бот запущен как {bot.user}")
 
