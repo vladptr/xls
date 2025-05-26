@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 import os
 import nacl
 import time
+import sqlite3
+from datetime import datetime, timedelta
 from webserver import keep_alive
 
 setup_messages = {}
@@ -38,7 +40,26 @@ intents.voice_states = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+#//////////////////////////////////////
 
+LEADERBOARD_CHANNEL_ID = 1373789452463243314
+conn = sqlite3.connect("voice_stats.db")
+cursor = conn.cursor()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS voice_time (
+    user_id INTEGER PRIMARY KEY,
+    total_seconds INTEGER
+)
+""")
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS voice_sessions (
+    user_id INTEGER,
+    start_time REAL
+)
+""")
+conn.commit()
+
+#//////////////////////////////////////
 # Переменные для музыки
 music_queue = []
 repeat_mode = False
@@ -81,7 +102,27 @@ async def on_ready():
 @bot.command()
 async def gonki(ctx):
     await ctx.send("поехали! я беру гоночную каляску ♿")
+#//////////////////////////////////////
 
+@bot.command()
+async def leaderboard(ctx):
+    cursor.execute("SELECT user_id, total_seconds FROM voice_time ORDER BY total_seconds DESC LIMIT 30")
+    rows = cursor.fetchall()
+    if not rows:
+        await ctx.send("Нет данных по времени в голосовых!")
+        return
+
+    leaderboard_text = "**🏆 Топ 30 по времени в голосовых:**\n"
+    for i, (user_id, total_seconds) in enumerate(rows, start=1):
+        member = ctx.guild.get_member(user_id)
+        name = member.display_name if member else f"User {user_id}"
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        leaderboard_text += f"{i}. {name}: {hours}ч {minutes}м {seconds}с\n"
+
+    await ctx.send(leaderboard_text)
+
+#//////////////////////////////////////
 @bot.command()
 async def join(ctx):
     if ctx.author.voice:
@@ -242,12 +283,12 @@ class PlayerCountSelect(Select):
             return
 
         count = self.values[0]
-        msg = f"+{count} <@&1159121098965786634> <#{voice_channel.id}>"
+        msg = f"+{count} <@&1159121098965786634> <#{voice_channel.id}> {interaction.user.mention}"
         sent_msg = await text_channel.send(msg)
         await interaction.response.send_message("Сообщение отправлено в канал 'поиск'.", ephemeral=True)
 
-        # Удаление сообщения через 30 минут
-        await asyncio.sleep(1800)
+        # Удаление сообщения через 3 часа
+        await asyncio.sleep(10800)
         await sent_msg.delete()
 
 
@@ -265,7 +306,27 @@ async def get_channel_lock(channel_id):
 @bot.event
 async def on_voice_state_update(member, before, after):
     guild = member.guild
+#//////////////////////////////////////
+    user_id = member.id
+    now = datetime.utcnow().timestamp()
 
+    if after.channel and not before.channel:
+        # Пользователь зашёл в голосовой
+        cursor.execute("INSERT INTO voice_sessions (user_id, start_time) VALUES (?, ?)", (user_id, now))
+        conn.commit()
+
+    elif before.channel and not after.channel:
+        # Пользователь вышел из голосового
+        cursor.execute("SELECT start_time FROM voice_sessions WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row:
+            start_time = row[0]
+            duration = int(now - start_time)
+            cursor.execute("DELETE FROM voice_sessions WHERE user_id = ?", (user_id,))
+            cursor.execute("INSERT OR IGNORE INTO voice_time (user_id, total_seconds) VALUES (?, 0)", (user_id,))
+            cursor.execute("UPDATE voice_time SET total_seconds = total_seconds + ? WHERE user_id = ?", (duration, user_id))
+            conn.commit()
+#//////////////////////////////////////
     if before.channel and before.channel.id in created_channels:
         await asyncio.sleep(1)  # можно оставить меньше, 3 сек много
         lock = await get_channel_lock(before.channel.id)
@@ -319,7 +380,7 @@ async def on_voice_state_update(member, before, after):
                 setup_messages[before.channel.id] = new_msg
                 print(f"Назначен новый владелец: {new_owner.name} для канала {before.channel.name}")
 
-    #//////////////////////////////////////////////////////
+
 
     if not after.channel or after.channel.name not in TRIGGER_CHANNELS:
         return
@@ -368,6 +429,46 @@ if not token:
 else:
     print("✅ Token loaded!")
 
+#//////////////////////////////////////
+
+async def weekly_reset():
+    while True:
+        now = datetime.utcnow()
+        # Рассчитываем время до ближайшего понедельника 00:00
+        next_monday = now + timedelta(days=(7 - now.weekday()))
+        next_reset = datetime.combine(next_monday.date(), datetime.min.time())
+        wait_time =  (next_reset - now).total_seconds() #2*60
+        await asyncio.sleep(wait_time)
+
+        guild = bot.guilds[0]  # Можно заменить на bot.get_guild(YOUR_GUILD_ID) для точного выбора
+        channel = guild.get_channel(LEADERBOARD_CHANNEL_ID)
+        if channel:
+            # Получаем топ-10 перед сбросом
+            cursor.execute("SELECT user_id, total_seconds FROM voice_time ORDER BY total_seconds DESC")
+            rows = cursor.fetchall()
+            if rows:
+                leaderboard_text = "**📊 Еженедельный отчет по активности в голосовых каналах:**\n"
+                for i, (user_id, total_seconds) in enumerate(rows, start=1):
+                    member = guild.get_member(user_id)
+                    name = member.display_name if member else f"User {user_id}"
+                    hours, remainder = divmod(total_seconds, 3600)
+                    minutes, seconds = divmod(remainder, 60)
+                    leaderboard_text += f"{i}. {name}: {hours}ч {minutes}м {seconds}с\n"
+                await channel.send(leaderboard_text)
+            else:
+                await channel.send("Не заходил в голосовые каналы 😢")
+
+        # Сброс статистики
+        cursor.execute("DELETE FROM voice_time")
+        conn.commit()
+        print("📅 Статистика по времени в голосовых сброшена!")
+
+@bot.event
+async def on_ready():
+    bot.loop.create_task(weekly_reset())
+    print(f"Бот запущен как {bot.user}")
+
+#//////////////////////////////////////
 
 async def main():
     keep_alive()
