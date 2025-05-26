@@ -6,4 +6,3 @@ PyNaCl
 ffmpeg-python
 ffmpeg
 yt-dlp
-sqlite3
