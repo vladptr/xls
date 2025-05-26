@@ -6,3 +6,4 @@ PyNaCl
 ffmpeg-python
 ffmpeg
 yt-dlp
+matplotlib
