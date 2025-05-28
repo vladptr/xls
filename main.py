@@ -18,6 +18,7 @@ from supabase import create_client, Client
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from webserver import keep_alive
 
 setup_messages = {}
 channel_locks = {}
