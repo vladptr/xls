@@ -665,7 +665,7 @@ async def on_ready():
     print(f"✅ Бот запущен как {bot.user}")
 
 #//////////////////////////////////////
-
+token = os.getenv("TOKEN")
 async def main():
     keep_alive()
     await bot.start(token)
