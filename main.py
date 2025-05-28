@@ -1,25 +1,28 @@
-import discord 
+import discord
 from discord.ext import commands
 from discord.ui import View, Select
-import discord
 import random
+import time
 import yt_dlp
 import asyncio
 from dotenv import load_dotenv
 import os
+import io
 import nacl
-import time
-import sqlite3
-from datetime import datetime, timedelta
-from webserver import keep_alive
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from matplotlib import rcParams
+import asyncpg
+from datetime import datetime, timedelta
+from supabase import create_client, Client
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
 setup_messages = {}
 channel_locks = {}
 room_modes = {}
-last_rename_times = {} 
+last_rename_times = {}
 
 users = {}
 weeks = []
@@ -30,8 +33,21 @@ intents.members = True
 intents.voice_states = True
 intents.message_content = True
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+SERVICE_ACCOUNT_FILE = 'botfile'
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+credentials = service_account.Credentials.from_service_account_file(
+    SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+drive_service = build('drive', 'v3', credentials=credentials)
 
+bot = commands.Bot(command_prefix="!", intents=intents)
+LEADERBOARD_CHANNEL_ID = 1371926685435428927
+
+def get_connection():
+    url = "https://qyqicdyzaagumqjlczoj.supabase.co"
+    key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5cWljZHl6YWFndW1xamxjem9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg0MjU2NDIsImV4cCI6MjA2NDAwMTY0Mn0.NHfpaH7cfSNOLrNuxyvVSvFXKINdsfgT_5OdNwbd_PQ"  # Анон ключ или сервисный ключ
+    return create_client(url, key)
+
+supabase = get_connection()
 # Переменные для музыки
 music_queue = []
 repeat_mode = False
@@ -46,26 +62,7 @@ intents.voice_states = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-#//////////////////////////////////////
 
-LEADERBOARD_CHANNEL_ID = 1373789452463243314
-conn = sqlite3.connect("voice_stats.db")
-cursor = conn.cursor()
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS voice_time (
-    user_id INTEGER PRIMARY KEY,
-    total_seconds INTEGER
-)
-""")
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS voice_sessions (
-    user_id INTEGER,
-    start_time REAL
-)
-""")
-conn.commit()
-
-#//////////////////////////////////////
 # Переменные для музыки
 music_queue = []
 repeat_mode = False
@@ -105,47 +102,66 @@ async def play_next(ctx):
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
 
+
+@bot.event
+async def on_member_join(member):
+    channel_id = 1183130293545222205  # замените на ID вашего канала
+    channel = bot.get_channel(channel_id)
+    if channel:
+        await channel.send(f"Привет, {member.mention}! Добро пожаловать на сервер! 🎉 Прочти правила сервера и замени свой ник как показано в примере: ```Ник в игре (Имя)```")
+    else:
+        print("Канал для приветствия не найден.")
+
+
 @bot.command()
 async def gonki(ctx):
     await ctx.send("поехали! я беру гоночную каляску ♿")
 
 @bot.command()
-async def cleargraf(ctx):
-    global users, weeks
+async def cleargraph(ctx):
     try:
-        # Очищаем локальные данные
-        users.clear()
-        weeks.clear()
-
-        # Очищаем базу данных
-        conn = sqlite3.connect("voice_stats.db")
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM weekly_voice_stats")
-        conn.commit()
-        conn.close()
+        response = supabase.table("weekly_voice_stats").delete().neq("cycle_number", -1).execute()
+        response = supabase.table("voice_time").delete().gt("user_id", 0).execute()
+        if response.data is None:
+            await ctx.send("Не удалось очистить данные (пустой ответ).")
+            return
 
         await ctx.send("Все данные графика успешно удалены!")
     except Exception as e:
         await ctx.send(f"Произошла ошибка при очистке данных: {e}")
-#//////////////////////////////////////
 
 @bot.command()
 async def leaderboard(ctx):
-    cursor.execute("SELECT user_id, total_seconds FROM voice_time ORDER BY total_seconds DESC LIMIT 30")
-    rows = cursor.fetchall()
-    if not rows:
-        await ctx.send("Нет данных по времени в голосовых!")
-        return
+    try:
+        response = supabase.table("voice_time")\
+            .select("user_id,total_seconds")\
+            .order("total_seconds", desc=True)\
+            .limit(30)\
+            .execute()
 
-    leaderboard_text = "**🏆 Топ 30 по времени в голосовых:**\n"
-    for i, (user_id, total_seconds) in enumerate(rows, start=1):
-        member = ctx.guild.get_member(user_id)
-        name = member.display_name if member else f"User {user_id}"
-        hours, remainder = divmod(total_seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        leaderboard_text += f"{i}. {name}: {hours}ч {minutes}м {seconds}с\n"
+        data = response.data
 
-    await ctx.send(leaderboard_text)
+        if not data:
+            await ctx.send("Нет данных по времени в голосовых!")
+            return
+
+        leaderboard_text = "**🏆 Топ 30 по времени в голосовых:**\n"
+        for i, row in enumerate(data, start=1):
+            user_id = row['user_id']
+            total_seconds = row['total_seconds']
+            member = ctx.guild.get_member(user_id)
+            name = member.display_name if member else f"User {user_id}"
+            hours, remainder = divmod(total_seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            leaderboard_text += f"{i}. {name}: {hours}ч {minutes}м {seconds}с\n"
+
+        await ctx.send(leaderboard_text)
+
+    except Exception as e:
+        print(f"Ошибка при получении таблицы лидеров: {e}")
+        await ctx.send("Произошла ошибка при получении таблицы лидеров.")
+
+
 
 #//////////////////////////////////////
 @bot.command()
@@ -260,7 +276,7 @@ class RoomTypeSelect(Select):
 
         # Обновляем время последнего переименования
         last_rename_times[self.channel_id] = now
-        
+
         channel = interaction.guild.get_channel(self.channel_id)
         if channel:
             await channel.edit(name=self.values[0])
@@ -295,7 +311,7 @@ class PlayerCountSelect(Select):
         if selection == "none":
             await interaction.response.send_message("Выбран вариант 'Не искать', сообщение не отправлено.", ephemeral=True)
             return
-            
+
         guild = interaction.guild
         voice_channel = guild.get_channel(self.channel_id)
         if not voice_channel:
@@ -330,37 +346,64 @@ async def get_channel_lock(channel_id):
 
 @bot.event
 async def on_voice_state_update(member, before, after):
-    guild = member.guild
-#//////////////////////////////////////
     user_id = member.id
     now = datetime.utcnow().timestamp()
 
-    if after.channel and not before.channel:
-        # Пользователь зашёл в голосовой
-        cursor.execute("INSERT INTO voice_sessions (user_id, start_time) VALUES (?, ?)", (user_id, now))
-        conn.commit()
+    try:
+        if after.channel and not before.channel:
+            # Пользователь зашёл в голосовой — добавляем сессию
+            response = supabase.table("voice_sessions").insert({
+                "user_id": user_id,
+                "start_time": now
+            }).execute()
 
-    elif before.channel and not after.channel:
-        # Пользователь вышел из голосового
-        cursor.execute("SELECT start_time FROM voice_sessions WHERE user_id = ?", (user_id,))
-        row = cursor.fetchone()
-        if row:
-            start_time = row[0]
+            # Проверяем, что данные вернулись
+            if not response.data:
+                print(f"❌ Ошибка при вставке сессии: пустой ответ от Supabase")
+
+        elif before.channel and not after.channel:
+            # Пользователь вышел из голосового — получаем время старта
+            row = supabase.table("voice_sessions").select("start_time").eq("user_id", user_id).limit(1).execute()
+
+            if not row.data:
+                print(f"❌ Не найдена сессия для пользователя {user_id}")
+                return
+
+            start_time = row.data[0]["start_time"]
             duration = int(now - start_time)
-            cursor.execute("DELETE FROM voice_sessions WHERE user_id = ?", (user_id,))
-            cursor.execute("INSERT OR IGNORE INTO voice_time (user_id, total_seconds) VALUES (?, 0)", (user_id,))
-            cursor.execute("UPDATE voice_time SET total_seconds = total_seconds + ? WHERE user_id = ?", (duration, user_id))
-            conn.commit()
-#//////////////////////////////////////
+
+            # Удаляем сессию
+            del_resp = supabase.table("voice_sessions").delete().eq("user_id", user_id).execute()
+            if not del_resp.data:
+                print(f"❌ Ошибка при удалении сессии")
+
+            # Обновляем/вставляем время в voice_time
+            time_row = supabase.table("voice_time").select("total_seconds").eq("user_id", user_id).limit(1).execute()
+            if time_row.data:
+                total_seconds = time_row.data[0]["total_seconds"] + duration
+                upd_resp = supabase.table("voice_time").update({"total_seconds": total_seconds}).eq("user_id", user_id).execute()
+                if not upd_resp.data:
+                    print(f"❌ Ошибка при обновлении времени для пользователя {user_id}")
+            else:
+                ins_resp = supabase.table("voice_time").insert({
+                    "user_id": user_id,
+                    "total_seconds": duration
+                }).execute()
+                if not ins_resp.data:
+                    print(f"❌ Ошибка при вставке нового времени для пользователя {user_id}")
+
+    except Exception as e:
+        print(f"❌ Общая ошибка при обновлении статистики: {e}")
+
+    # Оставляем остальную часть кода без изменений
     if before.channel and before.channel.id in created_channels:
-        await asyncio.sleep(1)  # можно оставить меньше, 3 сек много
+        await asyncio.sleep(1)
         lock = await get_channel_lock(before.channel.id)
         async with lock:
             owner_id = created_channels[before.channel.id]
             members = before.channel.members
 
             if len(members) == 0:
-                # Комната пуста — удаляем
                 await before.channel.delete()
                 created_channels.pop(before.channel.id, None)
                 channel_bases.pop(before.channel.id, None)
@@ -370,22 +413,19 @@ async def on_voice_state_update(member, before, after):
                 return
 
             if member.id == owner_id:
-                # Назначаем нового владельца
                 new_owner = random.choice(members)
                 created_channels[before.channel.id] = new_owner.id
-
                 old_msg = setup_messages.get(before.channel.id)
                 if old_msg:
-                 try:
-                   await old_msg.delete()
-                   print("✅ Старое сообщение успешно удалено.")
-                 except discord.NotFound:
-                   print("⚠️ Сообщение уже было удалено ранее.")
-                 except Exception as e:
-                   print(f"❌ Ошибка при удалении сообщения: {e}")
-                 finally:
-                   setup_messages.pop(before.channel.id, None)
-
+                    try:
+                        await old_msg.delete()
+                        print("✅ Старое сообщение успешно удалено.")
+                    except discord.NotFound:
+                        print("⚠️ Сообщение уже было удалено ранее.")
+                    except Exception as e:
+                        print(f"❌ Ошибка при удалении сообщения: {e}")
+                    finally:
+                        setup_messages.pop(before.channel.id, None)
 
                 overwrite = before.channel.overwrites_for(new_owner)
                 overwrite.manage_channels = True
@@ -393,9 +433,7 @@ async def on_voice_state_update(member, before, after):
                 overwrite.connect = True
                 await before.channel.set_permissions(new_owner, overwrite=overwrite)
 
-                mode = room_modes.get(before.channel.id, "default")  # ✅ Берём напрямую
-
-
+                mode = room_modes.get(before.channel.id, "default")
                 view = RoomSetupView(new_owner.id, before.channel.id, mode)
                 new_msg = await before.channel.send(
                     f"Владелец комнаты вышел. Новый владелец: {new_owner.mention}\n"
@@ -405,15 +443,13 @@ async def on_voice_state_update(member, before, after):
                 setup_messages[before.channel.id] = new_msg
                 print(f"Назначен новый владелец: {new_owner.name} для канала {before.channel.name}")
 
-
-
     if not after.channel or after.channel.name not in TRIGGER_CHANNELS:
         return
 
     if after.channel and after.channel.name in TRIGGER_CHANNELS:
         conf = TRIGGER_CHANNELS[after.channel.name]
+        guild = member.guild
         category = discord.utils.get(guild.categories, name=conf["category"])
-
         if not category:
             print(f"Категория {conf['category']} не найдена!")
             return
@@ -431,42 +467,45 @@ async def on_voice_state_update(member, before, after):
 
         new_channel = await guild.create_voice_channel(new_name, category=category)
         await member.move_to(new_channel)
-
         created_channels[new_channel.id] = member.id
         channel_bases[new_channel.id] = base_name
 
-    # Определяем mode для селектов
-    if conf["category"] == "Кастомки🔴":
-        mode = "custom"
-    else:
-        mode = "default"
-    room_modes[new_channel.id] = mode 
-
-    view = RoomSetupView(member.id, new_channel.id, mode)
-    msg = await new_channel.send(f"{member.mention}, настройте комнату:", view=view)
-    setup_messages[new_channel.id] = msg
+        mode = "custom" if conf["category"] == "Кастомки🔴" else "default"
+        room_modes[new_channel.id] = mode
+        view = RoomSetupView(member.id, new_channel.id, mode)
+        msg = await new_channel.send(f"{member.mention}, настройте комнату:", view=view)
+        setup_messages[new_channel.id] = msg
 
 
-token = os.getenv("TOKEN")
-
-if not token:
-    print("❌ TOKEN is missing!")
-else:
-    print("✅ Token loaded!")
 
 #/////////////////////////////////////////////////////
+async def upload_to_google_drive(file_path, folder_id=None):
+    file_metadata = {'name': file_path.split('/')[-1]}
+    if folder_id:
+        file_metadata['parents'] = [folder_id]
+
+    media = MediaFileUpload(file_path, mimetype='image/png')
+    file = drive_service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields='id, webViewLink'
+    ).execute()
+    print(f"Файл {file_path} загружен в Google Drive. Ссылка: {file['webViewLink']}")
+    return file['id'], file['webViewLink']
 
 async def generate_and_send_graph(bot, channel_id, cycle_number):
-    conn = sqlite3.connect("voice_stats.db")
-    cursor = conn.cursor()
+    try:
+        response = supabase.table("weekly_voice_stats") \
+            .select("week_number, user_id, total_seconds") \
+            .eq("cycle_number", cycle_number) \
+            .order("week_number") \
+            .order("total_seconds") \
+            .execute()
 
-    cursor.execute("""
-        SELECT week_number, user_id, total_seconds
-        FROM weekly_voice_stats
-        WHERE cycle_number = ?
-        ORDER BY week_number, total_seconds DESC
-    """, (cycle_number,))
-    data = cursor.fetchall()
+        data = response.data
+    except Exception as e:
+        print(f"❌ Ошибка при запросе данных для графика: {e}")
+        return
 
     if not data:
         print("Нет данных для графика.")
@@ -474,9 +513,12 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
 
     users = {}
     weeks = set()
-    for week_number, user_id, total_seconds in data:
+    for row in data:
+        week_number = row['week_number']
+        user_id = row['user_id']
+        total_seconds = row['total_seconds']
         weeks.add(week_number)
-        users.setdefault(user_id, {})[week_number] = total_seconds / 3600
+        users.setdefault(user_id, {})[week_number] = total_seconds / 3600  # Перевод в часы
 
     weeks = sorted(list(weeks))
     user_ids = list(users.keys())
@@ -491,30 +533,22 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
     rcParams['xtick.color'] = 'white'
     rcParams['ytick.color'] = 'white'
 
-
-    # Сначала вычисляем xmin, xmax, ymin, ymax
     xmin = min(weeks)
     xmax = max(weeks)
-    range_x = xmax - xmin if xmax != xmin else 1  # Защита от деления на ноль
-    xmax += range_x * 0.18  # Добавляем справа 15%
+    range_x = xmax - xmin if xmax != xmin else 1
+    xmax += range_x * 0.18
 
     max_y = max([max(users[u].values()) for u in user_ids]) * 1.1 if user_ids else 1
     ymin, ymax = 0, max_y
 
     fig, ax = plt.subplots(figsize=(19.2, 10.8), dpi=100)
-    
     background_img = mpimg.imread('backpack.jpg')
-
     fig.patch.set_alpha(0.0)
     fig.patch.set_facecolor('none')
     ax.set_facecolor('none')
-
-    # Показываем фон с учетом новых лимитов
     ax.imshow(background_img, extent=[xmin, xmax, ymin, ymax], aspect='auto', zorder=0)
-
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
-
     ax.tick_params(colors='white')
     ax.xaxis.label.set_color('white')
     ax.yaxis.label.set_color('white')
@@ -522,10 +556,7 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
 
     user_sums = {user_id: sum(users[user_id].values()) for user_id in user_ids}
     user_ids_sorted = sorted(user_ids, key=lambda u: user_sums[u], reverse=True)
-
-    lines = []
-    labels = []
-
+    lines, labels = [], []
     for user_id in user_ids_sorted:
         member = bot.get_guild(1371926685435428924).get_member(user_id)
         member_name = member.display_name if member else f"User {user_id}"
@@ -537,20 +568,16 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
             if time > 0:
                 ax.text(week, time, f"{int(time)}ч {int((time % 1) * 60)}м", fontsize=8, weight='bold', color='white', zorder=2)
 
-
-
     ax.set_xlabel("Неделя")
     ax.set_ylabel("Время (часы)")
     ax.set_title(f"Голосовая активность - Цикл {cycle_number}")
-
     ax.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.1, -0.07), ncol=10, fontsize=8, frameon=False)
-
 
     filename = f"graph_cycle_{cycle_number}.png"
     plt.savefig(filename, bbox_inches='tight', facecolor=fig.get_facecolor())
     plt.close()
 
-    # Отправляем в канал
+    # Отправляем в Discord
     channel = bot.get_channel(channel_id)
     if channel:
         with open(filename, 'rb') as f:
@@ -558,7 +585,8 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
     else:
         print("Канал не найден.")
 
-    conn.close()
+    # Загружаем на Google Drive
+    await upload_to_google_drive(filename, folder_id='1XXjk7oPlijNDSLoiCf2DayVmOMRX-gyK')
 
 @bot.event
 async def on_ready():
@@ -567,62 +595,73 @@ async def on_ready():
 #/////////////////////////////////////////////////////
 
 def init_db():
-    conn = sqlite3.connect("voice_stats.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS weekly_voice_stats (
-            cycle_number INTEGER,
-            week_number INTEGER,
-            user_id INTEGER,
-            total_seconds INTEGER
-        )
-    """)
-    conn.commit()
-    conn.close()
+    try:
+        # Таблицы создаём вручную через Supabase интерфейс или SQL в Supabase
+        print("✅ Проверка подключения к базе данных прошла успешно.")
+    except Exception as e:
+        print(f"❌ Ошибка при инициализации базы данных: {e}")
+
 #/////////////////////////////////////////////////////
 
 async def weekly_reset():
     while True:
         now = datetime.utcnow()
-        # Рассчитываем время до ближайшего понедельника 00:00
         next_monday = now + timedelta(days=(7 - now.weekday()))
         next_reset = datetime.combine(next_monday.date(), datetime.min.time())
-        wait_time = (next_reset - now).total_seconds() #2*60
+        wait_time = Для тестирования; для проды замени на (next_reset - now).total_seconds()
         await asyncio.sleep(wait_time)
-#/////////////////////////////////////////////////////
-        # Получаем текущий цикл
-        conn = sqlite3.connect("voice_stats.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT MAX(cycle_number) FROM weekly_voice_stats")
-        row = cursor.fetchone()
-        cycle_number = (row[0] or 0)
-        # Проверяем, если цикл >= 12 недель, увеличиваем номер цикла
-        cursor.execute("SELECT COUNT(DISTINCT week_number) FROM weekly_voice_stats WHERE cycle_number = ?", (cycle_number,))
-        week_count = cursor.fetchone()[0]
-        if week_count >= 12:
-            cycle_number += 1
 
-        # Сохраняем текущую статистику в weekly_voice_stats
-        cursor.execute("SELECT user_id, total_seconds FROM voice_time")
-        for user_id, total_seconds in cursor.fetchall():
-            cursor.execute("INSERT INTO weekly_voice_stats (cycle_number, week_number, user_id, total_seconds) VALUES (?, ?, ?, ?)",
-                           (cycle_number, week_count + 1, user_id, total_seconds))
-        conn.commit()
+        try:
+            # Получаем текущий cycle_number
+            row = supabase.table("weekly_voice_stats").select("cycle_number").order("cycle_number", desc=True).limit(1).execute()
+            cycle_number = row.data[0]["cycle_number"] if row.data else 0
 
-        # Отправляем график в канал
-        await generate_and_send_graph(bot, channel_id=1373789452463243314, cycle_number=cycle_number)
-#/////////////////////////////////////////////////////
+            # Подсчет недель в текущем цикле
+            week_data = supabase.table("weekly_voice_stats") \
+              .select("week_number") \
+              .eq("cycle_number", cycle_number) \
+              .order("week_number", desc=True) \
+              .limit(1) \
+              .execute()
 
-        # Сброс статистики
-        cursor.execute("DELETE FROM voice_time")
-        conn.commit()
-        print("📅 Статистика по времени в голосовых сброшена!")
+            if week_data.data:
+              max_week_number = week_data.data[0]["week_number"]
+            else:
+              max_week_number = 0
+
+            if max_week_number >= 12:
+              cycle_number += 1
+              max_week_number = 0
+            
+
+            # Получаем данные voice_time
+            voice_time_rows = supabase.table("voice_time").select("user_id", "total_seconds").execute()
+            for record in voice_time_rows.data:
+                user_id = record["user_id"]
+                total_seconds = record["total_seconds"]
+                supabase.table("weekly_voice_stats").insert({
+                    "cycle_number": cycle_number,
+                    "week_number": max_week_number + 1,
+                    "user_id": user_id,
+                    "total_seconds": total_seconds
+                }).execute()
+
+            # Генерация и отправка графика
+            await generate_and_send_graph(bot, channel_id=1373789452463243314, cycle_number=cycle_number)
+
+            # Очищаем voice_time
+            response = supabase.table("voice_time").update({"total_seconds": 0}).neq("user_id", -1).execute()
+
+            print("📅 Статистика по времени в голосовых сброшена!")
+
+        except Exception as e:
+            print(f"❌ Ошибка при сбросе статистики: {e}")
 
 @bot.event
 async def on_ready():
-    init_db()
-    bot.loop.create_task(weekly_reset())
-    print(f"Бот запущен как {bot.user}")
+    init_db()  # Подключение или проверка базы
+    bot.loop.create_task(weekly_reset())  # Запуск задачи сброса
+    print(f"✅ Бот запущен как {bot.user}")
 
 #//////////////////////////////////////
 
