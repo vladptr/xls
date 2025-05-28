@@ -44,7 +44,7 @@ LEADERBOARD_CHANNEL_ID = 1371926685435428927
 
 def get_connection():
     url = "https://qyqicdyzaagumqjlczoj.supabase.co"
-    key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5cWljZHl6YWFndW1xamxjem9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg0MjU2NDIsImV4cCI6MjA2NDAwMTY0Mn0.NHfpaH7cfSNOLrNuxyvVSvFXKINdsfgT_5OdNwbd_PQ"  # Анон ключ или сервисный ключ
+    key = (keykey)  # Анон ключ или сервисный ключ
     return create_client(url, key)
 
 supabase = get_connection()
