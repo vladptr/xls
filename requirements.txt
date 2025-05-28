@@ -7,3 +7,11 @@ ffmpeg-python
 ffmpeg
 yt-dlp
 matplotlib
+supabase
+asyncpg
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-auth-oauthlib
+twitchAPI
+aiohttp
