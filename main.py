@@ -33,7 +33,7 @@ intents.members = True
 intents.voice_states = True
 intents.message_content = True
 
-SERVICE_ACCOUNT_FILE = 'botfile'
+SERVICE_ACCOUNT_FILE = 'botfile.json'
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 credentials = service_account.Credentials.from_service_account_file(
     SERVICE_ACCOUNT_FILE, scopes=SCOPES)
