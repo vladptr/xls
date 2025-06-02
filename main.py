@@ -208,8 +208,8 @@ async def leaderboard(ctx):
         embed = view.generate_embed()
         message = await ctx.send(embed=embed, view=view)
         
-        # Удаляем сообщение с топом и командой через 5 минут (300 секунд)
-        await asyncio.sleep(10)
+       
+        await asyncio.sleep(300)
         await message.delete()
         try:
             await ctx.message.delete()
