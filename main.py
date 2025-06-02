@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 from discord.ui import View, Select
+from discord.ui import View, Button
 import random
 import time
 import yt_dlp
@@ -9,6 +10,7 @@ from dotenv import load_dotenv
 import os
 import io
 import nacl
+
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from matplotlib import rcParams
@@ -45,7 +47,7 @@ LEADERBOARD_CHANNEL_ID = 1371926685435428927
 
 def get_connection():
     url = "https://qyqicdyzaagumqjlczoj.supabase.co"
-    key = os.getenv("keykey")  # Анон ключ или сервисный ключ
+    key = os.getenv("keykey")  
     return create_client(url, key)
 
 supabase = get_connection()
@@ -137,7 +139,7 @@ async def leaderboard(ctx):
         response = supabase.table("voice_time")\
             .select("user_id,total_seconds")\
             .order("total_seconds", desc=True)\
-            .limit(30)\
+            .limit(50)\
             .execute()
 
         data = response.data
@@ -146,7 +148,7 @@ async def leaderboard(ctx):
             await ctx.send("Нет данных по времени в голосовых!")
             return
 
-        leaderboard_text = "**🏆 Топ 30 по времени в голосовых:**\n"
+        leaderboard_text = "**🏆 Топ 50 по времени в голосовых:**\n"
         for i, row in enumerate(data, start=1):
             user_id = row['user_id']
             total_seconds = row['total_seconds']
@@ -528,6 +530,10 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
         print("Нет пользователей для построения графика.")
         return
 
+    guild = bot.get_guild(520183812148166656)
+    await guild.fetch_members(limit=None)
+    members_dict = {member.id: member.display_name for member in guild.members}
+
     rcParams['font.family'] = 'Arial'
     rcParams['text.color'] = 'white'
     rcParams['axes.labelcolor'] = 'white'
@@ -572,7 +578,7 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
     ax.set_xlabel("Неделя")
     ax.set_ylabel("Время (часы)")
     ax.set_title(f"Голосовая активность - Цикл {cycle_number}")
-    ax.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.1, -0.07), ncol=10, fontsize=8, frameon=False)
+    ax.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.1, -0.07), ncol=6, fontsize=8, frameon=False)
 
     filename = f"graph_cycle_{cycle_number}.png"
     plt.savefig(filename, bbox_inches='tight', facecolor=fig.get_facecolor())
@@ -582,7 +588,7 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
     channel = bot.get_channel(channel_id)
     if channel:
         with open(filename, 'rb') as f:
-            await channel.send(content=f"📊 Статистика голосовой активности за цикл {cycle_number}:", file=discord.File(f))
+            await channel.send(content=f"Цикл {cycle_number}:", file=discord.File(f))
     else:
         print("Канал не найден.")
 
