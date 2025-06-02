@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 import os
 import io
 import nacl
-
+import math
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from matplotlib import rcParams
@@ -133,6 +133,63 @@ async def cleargraph(ctx):
     except Exception as e:
         await ctx.send(f"Произошла ошибка при очистке данных: {e}")
 
+class LeaderboardView(View):
+    def __init__(self, data, ctx):
+        super().__init__(timeout=60)
+        self.data = data
+        self.ctx = ctx
+        self.page = 0
+        self.items_per_page = 10
+        self.max_page = math.ceil(len(data) / self.items_per_page) - 1
+
+        self.prev_button = Button(label="⬅️ Назад", style=discord.ButtonStyle.primary)
+        self.next_button = Button(label="➡️ Вперед", style=discord.ButtonStyle.primary)
+        self.prev_button.callback = self.prev_page
+        self.next_button.callback = self.next_page
+        self.add_item(self.prev_button)
+        self.add_item(self.next_button)
+
+    async def prev_page(self, interaction):
+        if interaction.user != self.ctx.author:
+            await interaction.response.send_message("Это меню не для тебя!", ephemeral=True)
+            return
+        if self.page > 0:
+            self.page -= 1
+            await self.update_message(interaction)
+
+    async def next_page(self, interaction):
+        if interaction.user != self.ctx.author:
+            await interaction.response.send_message("Это меню не для тебя!", ephemeral=True)
+            return
+        if self.page < self.max_page:
+            self.page += 1
+            await self.update_message(interaction)
+
+    async def update_message(self, interaction):
+        embed = self.generate_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    def generate_embed(self):
+        start = self.page * self.items_per_page
+        end = start + self.items_per_page
+        page_data = self.data[start:end]
+        
+        embed = discord.Embed(
+            title=f"🏆 Топ по времени в голосовых (Страница {self.page + 1}/{self.max_page + 1})",
+            color=discord.Color.gold()
+        )
+
+        for i, row in enumerate(page_data, start=start + 1):
+            user_id = row['user_id']
+            total_seconds = row['total_seconds']
+            member = self.ctx.guild.get_member(user_id)
+            name = member.display_name if member else f"User {user_id}"
+            hours, remainder = divmod(total_seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            embed.add_field(name=f"{i}. {name}", value=f"{hours}ч {minutes}м {seconds}с", inline=False)
+        
+        return embed
+
 @bot.command()
 async def leaderboard(ctx):
     try:
@@ -141,31 +198,27 @@ async def leaderboard(ctx):
             .order("total_seconds", desc=True)\
             .limit(50)\
             .execute()
-
         data = response.data
 
         if not data:
             await ctx.send("Нет данных по времени в голосовых!")
             return
 
-        leaderboard_text = "**🏆 Топ 50 по времени в голосовых:**\n"
-        for i, row in enumerate(data, start=1):
-            user_id = row['user_id']
-            total_seconds = row['total_seconds']
-            member = ctx.guild.get_member(user_id)
-            name = member.display_name if member else f"User {user_id}"
-            hours, remainder = divmod(total_seconds, 3600)
-            minutes, seconds = divmod(remainder, 60)
-            leaderboard_text += f"{i}. {name}: {hours}ч {minutes}м {seconds}с\n"
-
-        await ctx.send(leaderboard_text)
+        view = LeaderboardView(data, ctx)
+        embed = view.generate_embed()
+        message = await ctx.send(embed=embed, view=view)
+        
+        # Удаляем сообщение с топом и командой через 5 минут (300 секунд)
+        await asyncio.sleep(10)
+        await message.delete()
+        try:
+            await ctx.message.delete()
+        except discord.errors.Forbidden:
+            pass
 
     except Exception as e:
         print(f"Ошибка при получении таблицы лидеров: {e}")
         await ctx.send("Произошла ошибка при получении таблицы лидеров.")
-
-
-
 #//////////////////////////////////////
 @bot.command()
 async def join(ctx):
@@ -613,7 +666,7 @@ def init_db():
 async def weekly_reset():
     while True:
         now = datetime.utcnow()
-        next_monday = now + timedelta(days=(7 - now.weekday()))
+        next_monday = now + timedelta(days=(2 - now.weekday() + 7) % 7)
         next_reset = datetime.combine(next_monday.date(), datetime.min.time())
         wait_time = (next_reset - now).total_seconds()
         await asyncio.sleep(wait_time)
