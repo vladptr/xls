@@ -618,7 +618,7 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
     user_ids_sorted = sorted(user_ids, key=lambda u: user_sums[u], reverse=True)
     lines, labels = [], []
     for user_id in user_ids_sorted:
-        member = bot.get_guild(1371926685435428924).get_member(user_id)
+        member = bot.get_guild(520183812148166656).get_member(user_id)
         member_name = member.display_name if member else f"User {user_id}"
         times = [users[user_id].get(week, 0) for week in weeks]
         line, = ax.plot(weeks, times, marker='o', label=member_name, zorder=1)
