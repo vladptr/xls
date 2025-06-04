@@ -666,7 +666,7 @@ async def weekly_reset():
         now = datetime.utcnow()
         next_monday = now + timedelta(days=(2 - now.weekday() + 7) % 7)
         next_reset = datetime.combine(next_monday.date(), datetime.min.time())
-        wait_time = (next_reset - now).total_seconds()
+        wait_time = 1*60 #(next_reset - now).total_seconds()
         await asyncio.sleep(wait_time)
 
         try:
