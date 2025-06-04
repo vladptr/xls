@@ -638,7 +638,7 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
     plt.close()
 
     # Отправляем в Discord
-    channel = bot.get_channel(channel_id)
+    channel = await bot.fetch_channel(channel_id)
     if channel:
         with open(filename, 'rb') as f:
             await channel.send(content=f"Цикл {cycle_number}:", file=discord.File(f))
