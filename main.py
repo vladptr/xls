@@ -119,7 +119,30 @@ async def on_member_join(member):
 @bot.command()
 async def gonki(ctx):
     await ctx.send("поехали! я беру гоночную каляску ♿")
+    
+@bot.command()
+async def getgraph(ctx, cycle_number: int = None):
+    try:
+        # Если не передали номер цикла — получаем последний
+        if cycle_number is None:
+            row = supabase.table("weekly_voice_stats") \
+                .select("cycle_number") \
+                .order("cycle_number", desc=True) \
+                .limit(1) \
+                .execute()
 
+            if row.data:
+                cycle_number = row.data[0]["cycle_number"]
+            else:
+                await ctx.send("❌ Нет данных по голосовой активности.")
+                return
+
+        # Генерируем и отправляем график
+        await generate_and_send_graph(bot, ctx.channel.id, cycle_number)
+
+    except Exception as e:
+        await ctx.send(f"❌ Ошибка при создании графика: {e}")
+        
 @bot.command()
 async def cleargraph(ctx):
     try:
@@ -583,8 +606,7 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
         print("Нет пользователей для построения графика.")
         return
 
-    guild = bot.get_guild(520183812148166656)
-    await guild.fetch_members(limit=None)
+    guild = bot.get_guild(520183812148166656)   
     members_dict = {member.id: member.display_name for member in guild.members}
 
     rcParams['font.family'] = 'Arial'
@@ -666,7 +688,7 @@ async def weekly_reset():
         now = datetime.utcnow()
         next_monday = now + timedelta(days=(2 - now.weekday() + 7) % 7)
         next_reset = datetime.combine(next_monday.date(), datetime.min.time())
-        wait_time = 5*60 #(next_reset - now).total_seconds()
+        wait_time = (next_reset - now).total_seconds()
         await asyncio.sleep(wait_time)
 
         try:
