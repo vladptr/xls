@@ -243,7 +243,7 @@ async def leaderboard(ctx):
             return
 
         view = LeaderboardView(data, ctx)
-        embed = view.generate_embed()
+        embed = await view.generate_embed()
         message = await ctx.send(embed=embed, view=view)
         
        
