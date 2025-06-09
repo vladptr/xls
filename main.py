@@ -205,7 +205,7 @@ class LeaderboardView(View):
         for i, row in enumerate(page_data, start=start + 1):
             user_id = row['user_id']
             total_seconds = row['total_seconds']
-            member = self.ctx.guild.get_member(user_id)
+            member = self.ctx.guild.get_member(user_id) or await self.ctx.guild.fetch_member(user_id)
             name = member.display_name if member else f"User {user_id}"
             hours, remainder = divmod(total_seconds, 3600)
             minutes, seconds = divmod(remainder, 60)
@@ -213,6 +213,7 @@ class LeaderboardView(View):
         
         return embed
 
+@commands.cooldown(1, 60, commands.BucketType.user)
 @bot.command()
 async def leaderboard(ctx):
     try:
