@@ -22,7 +22,6 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from webserver import keep_alive
 
-stop ыаыаыаыа
 
 setup_messages = {}
 channel_locks = {}
