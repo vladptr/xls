@@ -35,6 +35,7 @@ intents = discord.Intents.default()
 intents.guilds = True
 intents.members = True
 intents.voice_states = True
+intents.messages = True
 intents.message_content = True
 
 SERVICE_ACCOUNT_FILE = 'botfile.json'
@@ -66,11 +67,8 @@ repeat_mode = False
 YDL_OPTIONS = {'format': 'bestaudio'}
 FFMPEG_OPTIONS = {'options': '-vn'}
 
-intents = discord.Intents.default()
-intents.guilds = True
-intents.members = True
-intents.voice_states = True
-intents.message_content = True
+
+
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -109,9 +107,7 @@ async def play_next(ctx):
     else:
         await asyncio.sleep(1)
 
-@bot.event
-async def on_ready():
-    print(f"✅ Logged in as {bot.user}")
+
 
 
 @bot.event
