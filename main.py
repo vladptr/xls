@@ -42,6 +42,13 @@ credentials = service_account.Credentials.from_service_account_file(
     SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 drive_service = build('drive', 'v3', credentials=credentials)
 
+BLACKLISTED_CHANNELS = {
+    123456789012345678,
+    987654321098765432,
+}
+
+
+
 bot = commands.Bot(command_prefix="!", intents=intents)
 LEADERBOARD_CHANNEL_ID = 1371926685435428927
 
@@ -437,6 +444,9 @@ async def on_voice_state_update(member, before, after):
 
     try:
         if after.channel and not before.channel:
+            if after.channel.id in BLACKLISTED_CHANNELS:
+                return
+
             # Пользователь зашёл в голосовой — добавляем сессию
             response = supabase.table("voice_sessions").insert({
                 "user_id": user_id,
@@ -448,6 +458,8 @@ async def on_voice_state_update(member, before, after):
                 print(f"❌ Ошибка при вставке сессии: пустой ответ от Supabase")
 
         elif before.channel and not after.channel:
+            if before.channel.id in BLACKLISTED_CHANNELS:
+                return
             # Пользователь вышел из голосового — получаем время старта
             row = supabase.table("voice_sessions").select("start_time").eq("user_id", user_id).limit(1).execute()
 
