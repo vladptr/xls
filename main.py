@@ -50,8 +50,8 @@ credentials = service_account.Credentials.from_service_account_info(
 drive_service = build('drive', 'v3', credentials=credentials)
 
 BLACKLISTED_CHANNELS = {
-    123456789012345678,
-    987654321098765432,
+    1187507350156886096,
+    848713620959002684,
 }
 
 
