@@ -189,14 +189,14 @@ class LeaderboardView(View):
             await self.update_message(interaction)
 
     async def update_message(self, interaction):
-        embed = self.generate_embed()
+        embed = await self.generate_embed()
         await interaction.response.edit_message(embed=embed, view=self)
 
-    def generate_embed(self):
+    async def generate_embed(self):
         start = self.page * self.items_per_page
         end = start + self.items_per_page
         page_data = self.data[start:end]
-        
+
         embed = discord.Embed(
             title=f"🏆 Топ по времени в голосовых (Страница {self.page + 1}/{self.max_page + 1})",
             color=discord.Color.gold()
@@ -205,12 +205,18 @@ class LeaderboardView(View):
         for i, row in enumerate(page_data, start=start + 1):
             user_id = row['user_id']
             total_seconds = row['total_seconds']
-            member = self.ctx.guild.get_member(user_id) or await self.ctx.guild.fetch_member(user_id)
+            member = self.ctx.guild.get_member(user_id)
+            if member is None:
+                try:
+                    member = await self.ctx.guild.fetch_member(user_id)
+                except discord.NotFound:
+                    member = None
+
             name = member.display_name if member else f"User {user_id}"
             hours, remainder = divmod(total_seconds, 3600)
             minutes, seconds = divmod(remainder, 60)
             embed.add_field(name=f"{i}. {name}", value=f"{hours}ч {minutes}м {seconds}с", inline=False)
-        
+
         return embed
 
 @commands.cooldown(1, 60, commands.BucketType.user)
