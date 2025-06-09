@@ -8,6 +8,7 @@ import yt_dlp
 import asyncio
 from dotenv import load_dotenv
 import os
+import json
 import io
 import nacl
 import math
