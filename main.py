@@ -22,7 +22,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from webserver import keep_alive
-
+from datetime import datetime, UTC
 
 setup_messages = {}
 channel_locks = {}
@@ -442,7 +442,7 @@ async def get_channel_lock(channel_id):
 @bot.event
 async def on_voice_state_update(member, before, after):
     user_id = member.id
-    now = datetime.utcnow().timestamp()
+    now = datetime.now(UTC).timestamp()
 
     try:
         if after.channel and not before.channel:
