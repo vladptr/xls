@@ -704,12 +704,17 @@ def init_db():
 
 #/////////////////////////////////////////////////////
 
+
 async def weekly_reset():
     while True:
         now = datetime.utcnow()
         next_monday = now + timedelta(days=(2 - now.weekday() + 7) % 7)
         next_reset = datetime.combine(next_monday.date(), datetime.min.time())
         wait_time = (next_reset - now).total_seconds()
+        
+        if wait_time < 0:
+            wait_time += 7 * 24 * 60 * 60
+
         await asyncio.sleep(wait_time)
 
         try:
@@ -748,7 +753,7 @@ async def weekly_reset():
                 }).execute()
 
             # Генерация и отправка графика
-            await generate_and_send_graph(bot, channel_id=1382276434273370193, cycle_number=cycle_number)
+            await generate_and_send_graph(bot, channel_id=1382278788464771173, cycle_number=cycle_number)
 
             # Очищаем voice_time
             response = supabase.table("voice_time").update({"total_seconds": 0}).neq("user_id", -1).execute()
