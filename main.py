@@ -124,6 +124,24 @@ async def on_member_join(member):
     else:
         print("Канал для приветствия не найден.")
 
+@bot.command(name="clearmsg")
+@commands.has_permissions(manage_messages=False)
+async def clear_bot_messages(ctx):
+    """Удаляет все сообщения от бота в текущем канале."""
+    deleted = 0
+    async for message in ctx.channel.history(limit=1000):  # Увеличь лимит при необходимости
+        if message.author == bot.user:
+            try:
+                await message.delete()
+                deleted += 1
+            except discord.Forbidden:
+                await ctx.send("❌ У меня нет прав на удаление сообщений.")
+                return
+            except discord.HTTPException:
+                continue  # Иногда Discord не позволяет удалить старые сообщения
+
+    await ctx.send(f"🧹 Удалено {deleted} сообщений от бота.", delete_after=5)
+
 
 @bot.command()
 async def gonki(ctx):
