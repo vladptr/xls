@@ -645,7 +645,17 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
     ymin, ymax = 0, max_y
 
     fig, ax = plt.subplots(figsize=(19.2, 10.8), dpi=100)
-    background_img = mpimg.imread('backpack.jpg')
+    #///
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    image_path = os.path.join(current_dir, "backpack.jpg")
+
+    if not os.path.exists(image_path):
+        print(f"❌ Файл не найден: {image_path}")
+    else:
+        print(f"✅ Файл найден: {image_path}")
+
+    background_img = mpimg.imread(image_path)
+    #///
     fig.patch.set_alpha(0.0)
     fig.patch.set_facecolor('none')
     ax.set_facecolor('none')
