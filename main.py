@@ -674,7 +674,7 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
     ax.set_xlabel("Неделя")
     ax.set_ylabel("Время (часы)")
     ax.set_title(f"Голосовая активность - Цикл {cycle_number}")
-    ax.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.9, -0.07), ncol=6, fontsize=8, frameon=False)
+    ax.legend(lines, labels, loc='upper center', bbox_to_anchor=(0.5, -0.07), ncol=6, fontsize=8, frameon=False)
 
     filename = f"graph_cycle_{cycle_number}.png"
     plt.savefig(filename, bbox_inches='tight', facecolor=fig.get_facecolor())
