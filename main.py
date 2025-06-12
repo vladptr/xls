@@ -1,4 +1,4 @@
-keyimport discord
+import discord
 from discord.ext import commands
 from discord.ui import View, Select
 from discord.ui import View, Button
