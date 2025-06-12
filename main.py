@@ -61,7 +61,14 @@ LEADERBOARD_CHANNEL_ID = 1371926685435428927
 
 def get_connection():
     url = "https://qyqicdyzaagumqjlczoj.supabase.co"
-    key = os.getenv("keykey")  
+    key = os.getenv("keykey")
+    
+    if not url or not key:
+        raise Exception("❌ Не найдены переменные окружения SUPABASE_URL или SUPABASE_KEY")
+    
+    print("🔐 URL:", os.getenv("SUPABASE_URL"))
+    print("🔐 KEY:", os.getenv("SUPABASE_KEY")[:10], "...")
+
     return create_client(url, key)
 
 supabase = get_connection()
@@ -796,6 +803,12 @@ async def on_ready():
     init_db()  # Подключение или проверка базы
     bot.loop.create_task(weekly_reset())  # Запуск задачи сброса
     print(f"✅ Бот запущен как {bot.user}")
+
+    try:
+        test = supabase.table("voice_time").select("*").limit(1).execute()
+        print("🟢 Подключение к Supabase успешно!")
+    except Exception as e:
+        print("❌ Ошибка подключения к Supabase:", e)
 
 #//////////////////////////////////////
 token = os.getenv("TOKEN")
