@@ -1,4 +1,4 @@
-import discord
+keyimport discord
 from discord.ext import commands
 from discord.ui import View, Select
 from discord.ui import View, Button
@@ -66,8 +66,8 @@ def get_connection():
     if not url or not key:
         raise Exception("❌ Не найдены переменные окружения SUPABASE_URL или SUPABASE_KEY")
     
-    print("🔐 URL:", os.getenv("SUPABASE_URL"))
-    print("🔐 KEY:", os.getenv("SUPABASE_KEY")[:10], "...")
+    print("🔐 URL:", os.getenv("https://qyqicdyzaagumqjlczoj.supabase.co"))
+    print("🔐 KEY:", os.getenv("keykey")[:10], "...")
 
     return create_client(url, key)
 
