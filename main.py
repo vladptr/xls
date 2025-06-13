@@ -82,7 +82,7 @@ YDL_OPTIONS = {
     'noplaylist': True,
     'quiet': True,
     'extract_flat': False,
-    'ffmpeg_location': './bin/ffmpeg'  # ✅ добавь это
+    'ffmpeg_location': './ffmpeg'  # ✅ добавь это
 }
 
 
@@ -129,7 +129,7 @@ async def play_next(ctx):
                 }],
                 'quiet': True,
                 'noplaylist': True,
-                'ffmpeg_location': './bin/ffmpeg'  # ✅ путь к ffmpeg
+                'ffmpeg_location': './ffmpeg'  # ✅ путь к ffmpeg
             }) as ydl:
                 ydl.download([url])
 
@@ -146,7 +146,7 @@ async def play_next(ctx):
                     os.remove(filename)
 
             # Воспроизводим mp3 (указываем путь к ffmpeg!)
-            source = discord.FFmpegPCMAudio(filename, executable='./bin/ffmpeg')
+            source = discord.FFmpegPCMAudio(filename, executable='./ffmpeg')
             ctx.voice_client.play(source, after=after_playing)
 
             if not repeat_mode:
