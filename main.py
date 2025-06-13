@@ -161,7 +161,7 @@ async def testplay(ctx):
         vc = await channel.connect()
 
         source = discord.FFmpegPCMAudio(
-            "Tokio_Machine.mp3",  # любой локальный mp3 файл
+            "Tokio_Machi.mp3",  # любой локальный mp3 файл
             executable="./ffmpeg",
             options="-vn -loglevel quiet"
         )
