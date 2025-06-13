@@ -154,7 +154,22 @@ async def play_next(vc):
         await vc.disconnect()
 
 
+@bot.command()
+async def testplay(ctx):
+    if ctx.author.voice:
+        channel = ctx.author.voice.channel
+        vc = await channel.connect()
 
+        source = discord.FFmpegPCMAudio(
+            "Tokio_Machine.mp3",  # любой локальный mp3 файл
+            executable="./ffmpeg",
+            options="-vn -loglevel quiet"
+        )
+
+        vc.play(source)
+        await ctx.send("🔊 Воспроизвожу test.mp3")
+    else:
+        await ctx.send("Ты не в голосовом канале.")
 
 
 @bot.event
@@ -184,22 +199,7 @@ async def clear_bot_messages(ctx):
 
     await ctx.send(f"🧹 Удалено {deleted} сообщений от бота.", delete_after=5)
 
-@bot.command()
-async def testplay(ctx):
-    if ctx.author.voice:
-        channel = ctx.author.voice.channel
-        vc = await channel.connect()
 
-        source = discord.FFmpegPCMAudio(
-            "Tokio_Machine.mp3",  # любой локальный mp3 файл
-            executable="./ffmpeg",
-            options="-vn -loglevel quiet"
-        )
-
-        vc.play(source)
-        await ctx.send("🔊 Воспроизвожу test.mp3")
-    else:
-        await ctx.send("Ты не в голосовом канале.")
         
 @bot.command()
 async def gonki(ctx):
