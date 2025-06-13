@@ -79,12 +79,13 @@ music_queue = []
 repeat_mode = True
 
 YDL_OPTIONS = {
-    'format': 'bestaudio[ext=mp3]/bestaudio',
+    'format': 'bestaudio/best',
     'noplaylist': True,
     'quiet': True,
     'extract_flat': False,
-    'ffmpeg_location': './ffmpeg'  # ✅ добавь это
+    'ffmpeg_location': './ffmpeg'
 }
+
 
 
 
