@@ -119,12 +119,20 @@ async def play_next(ctx):
 
             def after_playing(error):
                 if error:
-                    print(f"❗ Ошибка воспроизведения: {error}")
+                    print("❌ Произошла ошибка в after_playing:")
+                import traceback
+                    traceback.print_exception(type(error), error, error.__traceback__)
+                else:
+                    print("✅ Трек завершился корректно.")
+
                 fut = asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
                 try:
                     fut.result()
                 except Exception as e:
-                    print(f"❗ Ошибка в play_next: {e}")
+                    print("❗ Ошибка при вызове play_next:")
+                    import traceback
+                    traceback.print_exception(type(e), e, e.__traceback__)
+
             
             print(f"🔗 Скачанная ссылка на аудио: {audio_url}")
             print(f"🎧 Voice client: {ctx.voice_client}")
@@ -137,8 +145,8 @@ async def play_next(ctx):
             
             print("▶️ Воспроизведение началось")
             
-            if not repeat_mode:
-                music_queue.pop(0)
+            #if not repeat_mode:
+               # music_queue.pop(0)
 
         except Exception as e:
             print(f"❗ Ошибка загрузки или воспроизведения: {e}")
