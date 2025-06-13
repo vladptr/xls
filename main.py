@@ -81,7 +81,7 @@ FFMPEG_OPTIONS = {
     'options': '-vn',
     'executable': './ffmpeg'  # или './bin/ffmpeg', если в папке
 }
-source = await discord.FFmpegOpusAudio.from_probe(audio_url, **FFMPEG_OPTIONS)
+
 
 
 bot = commands.Bot(command_prefix="!", intents=intents)
