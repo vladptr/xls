@@ -77,9 +77,11 @@ music_queue = []
 repeat_mode = False
 
 YDL_OPTIONS = {'format': 'bestaudio'}
-FFMPEG_OPTIONS = {'options': '-vn'}
-
-
+FFMPEG_OPTIONS = {
+    'options': '-vn',
+    'executable': './ffmpeg'  # или './bin/ffmpeg', если в папке
+}
+source = await discord.FFmpegOpusAudio.from_probe(audio_url, **FFMPEG_OPTIONS)
 
 
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -110,9 +112,17 @@ async def play_next(ctx):
         with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
             info = ydl.extract_info(url, download=False)
             audio_url = info['url']
-
+        
+        def after_playing(error):
+            fut = asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
+            try:
+                fut.result()
+            except Exception as e:
+                print(f"Ошибка в play_next: {e}")
+                
         source = await discord.FFmpegOpusAudio.from_probe(audio_url, **FFMPEG_OPTIONS)
-        ctx.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
+        ctx.voice_client.play(source, after=after_playing)
+
 
         if not repeat_mode:
             music_queue.pop(0)
