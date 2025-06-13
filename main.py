@@ -78,11 +78,13 @@ music_queue = []
 repeat_mode = False
 
 YDL_OPTIONS = {
-    'format': 'bestaudio[ext=mp3]/bestaudio',  # Принудительно выбираем прямой MP3
+    'format': 'bestaudio[ext=mp3]/bestaudio',
     'noplaylist': True,
     'quiet': True,
     'extract_flat': False,
+    'ffmpeg_location': './bin/ffmpeg'  # ✅ добавь это
 }
+
 
 
 
@@ -126,7 +128,8 @@ async def play_next(ctx):
                     'preferredquality': '192',
                 }],
                 'quiet': True,
-                'noplaylist': True
+                'noplaylist': True,
+                'ffmpeg_location': './bin/ffmpeg'  # ✅ путь к ffmpeg
             }) as ydl:
                 ydl.download([url])
 
@@ -142,8 +145,8 @@ async def play_next(ctx):
                 if os.path.exists(filename):
                     os.remove(filename)
 
-            # Воспроизводим mp3
-            source = discord.FFmpegPCMAudio(filename)
+            # Воспроизводим mp3 (указываем путь к ffmpeg!)
+            source = discord.FFmpegPCMAudio(filename, executable='./bin/ffmpeg')
             ctx.voice_client.play(source, after=after_playing)
 
             if not repeat_mode:
