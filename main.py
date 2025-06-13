@@ -86,10 +86,6 @@ YDL_OPTIONS = {
 }
 
 
-
-
-bot = commands.Bot(command_prefix="!", intents=intents)
-
 # Переменные для музыки
 music_queue = []
 repeat_mode = False
@@ -322,10 +318,15 @@ async def join(ctx):
 async def play(ctx, url):
     music_queue.append(url)
     await ctx.send(f"Добавлено: {url}")
+
     if not ctx.voice_client:
         await join(ctx)
-    if not ctx.voice_client.is_playing():
+        # Ждём немного, чтобы точно подключился
+        await asyncio.sleep(1)
+
+    if ctx.voice_client and not ctx.voice_client.is_playing():
         await play_next(ctx)
+
 
 @bot.command()
 async def repeat(ctx):
