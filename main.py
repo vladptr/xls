@@ -8,6 +8,7 @@ import yt_dlp
 import asyncio
 from dotenv import load_dotenv
 import os
+import uuid
 import json
 import io
 import nacl
@@ -112,30 +113,47 @@ async def play_next(ctx):
         url = music_queue[0] if not repeat_mode else music_queue[-1]
         print(f"▶️ Воспроизведение: {url}")
 
-        with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-            info = ydl.extract_info(url, download=False)
-            audio_url = info['url']
-            print(f"🎧 Ссылка на аудио: {audio_url}")
+        filename = f"temp_{uuid.uuid4()}.mp3"
 
-        def after_playing(error):
-            if error:
-                print(f"❗ Ошибка во время воспроизведения: {error}")
-            fut = asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
-            try:
-                fut.result()
-            except Exception as e:
-                print(f"❗ Ошибка в play_next: {e}")
+        try:
+            # Скачиваем mp3 файл с yt_dlp
+            with yt_dlp.YoutubeDL({
+                'format': 'bestaudio/best',
+                'outtmpl': filename,
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }],
+                'quiet': True,
+                'noplaylist': True
+            }) as ydl:
+                ydl.download([url])
 
-        # Используем FFmpegPCMAudio вместо from_probe
-        source = discord.FFmpegPCMAudio(audio_url, **FFMPEG_OPTIONS)
-        ctx.voice_client.play(source, after=after_playing)
+            # Функция после окончания проигрывания
+            def after_playing(error):
+                if error:
+                    print(f"❗ Ошибка воспроизведения: {error}")
+                fut = asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
+                try:
+                    fut.result()
+                except Exception as e:
+                    print(f"❗ Ошибка в play_next: {e}")
+                if os.path.exists(filename):
+                    os.remove(filename)
 
-        if not repeat_mode:
-            music_queue.pop(0)
+            # Воспроизводим mp3
+            source = discord.FFmpegPCMAudio(filename)
+            ctx.voice_client.play(source, after=after_playing)
 
+            if not repeat_mode:
+                music_queue.pop(0)
+
+        except Exception as e:
+            print(f"❗ Ошибка загрузки или воспроизведения: {e}")
+            await ctx.send(f"Ошибка воспроизведения трека.")
     else:
-        print("⏸ Очередь пуста. Ожидание 60 секунд перед отключением.")
-        await asyncio.sleep(10*60)
+        await asyncio.sleep(60)
         if ctx.voice_client and not ctx.voice_client.is_playing():
             await ctx.voice_client.disconnect()
 
