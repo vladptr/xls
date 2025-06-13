@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import os
 import uuid
 import json
+import subprocess
 import io
 import nacl
 import math
@@ -32,7 +33,7 @@ last_rename_times = {}
 
 users = {}
 weeks = []
-
+subprocess.run(["chmod", "+x", "./ffmpeg"])
 intents = discord.Intents.default()
 intents.guilds = True
 intents.members = True
@@ -124,10 +125,18 @@ async def play_next(ctx):
                     fut.result()
                 except Exception as e:
                     print(f"❗ Ошибка в play_next: {e}")
+            
+            print(f"🔗 Скачанная ссылка на аудио: {audio_url}")
+            print(f"🎧 Voice client: {ctx.voice_client}")
 
-            source = await discord.FFmpegOpusAudio.from_probe(audio_url, executable='./ffmpeg', **FFMPEG_OPTIONS)
+            #source = await discord.FFmpegOpusAudio.from_probe(audio_url, executable='./ffmpeg', **FFMPEG_OPTIONS)
+            #ctx.voice_client.play(source, after=after_playing)
+            source = discord.FFmpegPCMAudio(audio_url, executable="./ffmpeg")
             ctx.voice_client.play(source, after=after_playing)
 
+            
+            print("▶️ Воспроизведение началось")
+            
             if not repeat_mode:
                 music_queue.pop(0)
 
@@ -135,9 +144,10 @@ async def play_next(ctx):
             print(f"❗ Ошибка загрузки или воспроизведения: {e}")
             await ctx.send("Ошибка воспроизведения трека.")
     else:
-        await asyncio.sleep(60)
-        if ctx.voice_client and not ctx.voice_client.is_playing():
+        if ctx.voice_client and ctx.voice_client.is_connected():
             await ctx.voice_client.disconnect()
+            await ctx.send("Отключился, так как очередь пуста.")
+
 
 
 
@@ -308,11 +318,16 @@ async def leaderboard(ctx):
 async def join(ctx):
     if ctx.author.voice:
         channel = ctx.author.voice.channel
+        print(f"🟢 Подключение к голосовому каналу: {channel.name}")
         if ctx.voice_client is None:
             await channel.connect()
             await ctx.send("Подключился к голосовому каналу.")
+        else:
+            print("⚠️ Уже подключён")
     else:
         await ctx.send("Ты должен быть в голосовом канале.")
+        print("❌ Пользователь не в голосовом")
+
 
 @bot.command()
 async def play(ctx, url):
