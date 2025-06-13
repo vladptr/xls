@@ -76,7 +76,7 @@ def get_connection():
 supabase = get_connection()
 # Переменные для музыки
 music_queue = []
-repeat_mode = False
+repeat_mode = True
 
 YDL_OPTIONS = {
     'format': 'bestaudio[ext=mp3]/bestaudio',
@@ -150,8 +150,8 @@ async def play_next(ctx):
             
             print("▶️ Воспроизведение началось")
             
-            #if not repeat_mode:
-               # music_queue.pop(0)
+            if not repeat_mode:
+               music_queue.pop(0)
 
         except Exception as e:
             print(f"❗ Ошибка загрузки или воспроизведения: {e}")
