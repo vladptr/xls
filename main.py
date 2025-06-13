@@ -118,9 +118,9 @@ async def play_next(ctx):
                 audio_url = info['url']
 
             def after_playing(error):
+                import traceback
                 if error:
                     print("❌ Произошла ошибка в after_playing:")
-                import traceback
                     traceback.print_exception(type(error), error, error.__traceback__)
                 else:
                     print("✅ Трек завершился корректно.")
@@ -130,8 +130,8 @@ async def play_next(ctx):
                     fut.result()
                 except Exception as e:
                     print("❗ Ошибка при вызове play_next:")
-                    import traceback
                     traceback.print_exception(type(e), e, e.__traceback__)
+
 
             
             print(f"🔗 Скачанная ссылка на аудио: {audio_url}")
