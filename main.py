@@ -77,7 +77,7 @@ music_queue = []
 repeat_mode = False
 
 YDL_OPTIONS = {
-    'format': 'http_mp3',  # Принудительно выбираем прямой MP3
+    'format': 'bestaudio[ext=mp3]/bestaudio',  # Принудительно выбираем прямой MP3
     'noplaylist': True,
     'quiet': True,
     'extract_flat': False,
