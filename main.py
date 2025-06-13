@@ -104,8 +104,12 @@ created_channels = {}
 channel_bases = {}
 
 # Муз функции
-async def play_next(ctx):
+async def play_next(vc):
     global music_queue, repeat_mode
+
+    if not vc.is_connected():
+        print("❌ VoiceClient не подключен, выходим из play_next")
+        return
 
     if music_queue:
         url = music_queue[0] if not repeat_mode else music_queue[-1]
@@ -116,49 +120,38 @@ async def play_next(ctx):
                 info = ydl.extract_info(url, download=False)
                 audio_url = info['url']
 
-            def after_playing(error):
-                import traceback
-                if error:
-                    print("❌ Произошла ошибка в after_playing:")
-                    traceback.print_exception(type(error), error, error.__traceback__)
-                else:
-                    print("✅ Трек завершился корректно.")
-
-                fut = asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
-                try:
-                    fut.result()
-                except Exception as e:
-                    print("❗ Ошибка при вызове play_next:")
-                    traceback.print_exception(type(e), e, e.__traceback__)
-
-
-            
             print(f"🔗 Скачанная ссылка на аудио: {audio_url}")
-            print(f"🎧 Voice client: {ctx.voice_client}")
 
-            #source = await discord.FFmpegOpusAudio.from_probe(audio_url, executable='./ffmpeg', **FFMPEG_OPTIONS)
-            #ctx.voice_client.play(source, after=after_playing)
             source = discord.FFmpegPCMAudio(
                 audio_url,
                 executable="./ffmpeg",
                 before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
                 options="-vn -loglevel quiet"
             )
-            ctx.voice_client.play(source, after=after_playing)
 
-            
+            def after_playing(error):
+                if error:
+                    print(f"❌ Ошибка в after_playing: {error}")
+                else:
+                    print("✅ Трек завершился корректно.")
+
+                fut = asyncio.run_coroutine_threadsafe(play_next(vc), bot.loop)
+                try:
+                    fut.result()
+                except Exception as e:
+                    print(f"❗ Ошибка в play_next after: {e}")
+
+            vc.play(source, after=after_playing)
             print("▶️ Воспроизведение началось")
-            
+
             if not repeat_mode:
-               music_queue.pop(0)
+                music_queue.pop(0)
 
         except Exception as e:
             print(f"❗ Ошибка загрузки или воспроизведения: {e}")
-            await ctx.send("Ошибка воспроизведения трека.")
     else:
-        if ctx.voice_client and ctx.voice_client.is_connected():
-            await ctx.voice_client.disconnect()
-            await ctx.send("Отключился, так как очередь пуста.")
+        print("🚪 Очередь пуста, отключаюсь")
+        await vc.disconnect()
 
 
 
@@ -344,16 +337,17 @@ async def join(ctx):
 @bot.command()
 async def play(ctx, url):
     music_queue.append(url)
-    await ctx.send(f"🎵 Добавлено в очередь: {url}")
+    await ctx.send(f"🎵 Добавлено: {url}")
 
-    # Если бот не подключён — паодключиться
     if not ctx.voice_client or not ctx.voice_client.is_connected():
         await join(ctx)
-        await asyncio.sleep(1)  # Немного подождать, чтобы голосовой клиент установился
+        await asyncio.sleep(1)
 
-    # Если ничего не играет — начать воспроизведение
-    if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
-        await play_next(ctx)
+    vc = ctx.voice_client
+
+    if vc and not vc.is_playing():
+        await play_next(vc)
+
 
 
 
