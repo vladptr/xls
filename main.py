@@ -139,7 +139,12 @@ async def play_next(ctx):
 
             #source = await discord.FFmpegOpusAudio.from_probe(audio_url, executable='./ffmpeg', **FFMPEG_OPTIONS)
             #ctx.voice_client.play(source, after=after_playing)
-            source = discord.FFmpegPCMAudio(audio_url, executable="./ffmpeg")
+            source = discord.FFmpegPCMAudio(
+                audio_url,
+                executable="./ffmpeg",
+                before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+                options="-vn -loglevel quiet"
+            )
             ctx.voice_client.play(source, after=after_playing)
 
             
