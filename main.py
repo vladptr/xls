@@ -106,28 +106,37 @@ channel_bases = {}
 # Муз функции
 async def play_next(ctx):
     global music_queue, repeat_mode
+
     if music_queue:
         url = music_queue[0] if not repeat_mode else music_queue[-1]
+        print(f"▶️ Воспроизведение: {url}")
 
         with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
             info = ydl.extract_info(url, download=False)
             audio_url = info['url']
-        
+            print(f"🎧 Ссылка на аудио: {audio_url}")
+
         def after_playing(error):
+            if error:
+                print(f"❗ Ошибка во время воспроизведения: {error}")
             fut = asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
             try:
                 fut.result()
             except Exception as e:
-                print(f"Ошибка в play_next: {e}")
-                
-        source = await discord.FFmpegOpusAudio.from_probe(audio_url, **FFMPEG_OPTIONS)
-        ctx.voice_client.play(source, after=after_playing)
+                print(f"❗ Ошибка в play_next: {e}")
 
+        # Используем FFmpegPCMAudio вместо from_probe
+        source = discord.FFmpegPCMAudio(audio_url, **FFMPEG_OPTIONS)
+        ctx.voice_client.play(source, after=after_playing)
 
         if not repeat_mode:
             music_queue.pop(0)
+
     else:
-        await asyncio.sleep(1)
+        print("⏸ Очередь пуста. Ожидание 60 секунд перед отключением.")
+        await asyncio.sleep(10*60)
+        if ctx.voice_client and not ctx.voice_client.is_playing():
+            await ctx.voice_client.disconnect()
 
 
 
