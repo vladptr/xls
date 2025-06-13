@@ -87,9 +87,7 @@ YDL_OPTIONS = {
 }
 
 
-# Переменные для музыки
-music_queue = []
-repeat_mode = False
+
 
 YDL_OPTIONS = {'format': 'bestaudio'}
 FFMPEG_OPTIONS = {'options': '-vn'}
@@ -345,15 +343,17 @@ async def join(ctx):
 @bot.command()
 async def play(ctx, url):
     music_queue.append(url)
-    await ctx.send(f"Добавлено: {url}")
+    await ctx.send(f"🎵 Добавлено в очередь: {url}")
 
-    if not ctx.voice_client:
+    # Если бот не подключён — паодключиться
+    if not ctx.voice_client or not ctx.voice_client.is_connected():
         await join(ctx)
-        # Ждём немного, чтобы точно подключился
-        await asyncio.sleep(1)
+        await asyncio.sleep(1)  # Немного подождать, чтобы голосовой клиент установился
 
-    if ctx.voice_client and not ctx.voice_client.is_playing():
+    # Если ничего не играет — начать воспроизведение
+    if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
         await play_next(ctx)
+
 
 
 @bot.command()
