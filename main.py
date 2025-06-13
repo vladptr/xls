@@ -76,10 +76,11 @@ supabase = get_connection()
 music_queue = []
 repeat_mode = False
 
-YDL_OPTIONS = {'format': 'bestaudio'}
-FFMPEG_OPTIONS = {
-    'options': '-vn',
-    'executable': './ffmpeg'  # или './bin/ffmpeg', если в папке
+YDL_OPTIONS = {
+    'format': 'http_mp3',  # Принудительно выбираем прямой MP3
+    'noplaylist': True,
+    'quiet': True,
+    'extract_flat': False,
 }
 
 
