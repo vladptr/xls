@@ -853,7 +853,7 @@ async def weekly_reset():
                 }).execute()
 
             # Генерация и отправка графика
-            await generate_and_send_graph(bot, channel_id=1382278788464771173, cycle_number=cycle_number)
+            #await generate_and_send_graph(bot, channel_id=1382278788464771173, cycle_number=cycle_number)
 
             # Очищаем voice_time
             supabase.table("voice_time").update({"total_seconds": 0}).neq("user_id", -1).execute()
