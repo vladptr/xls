@@ -807,37 +807,38 @@ def init_db():
 async def weekly_reset():
     while True:
         now = datetime.utcnow()
-        next_monday = now + timedelta(days=(2 - now.weekday() + 7) % 7)
-        next_reset = datetime.combine(next_monday.date(), datetime.min.time())
-        wait_time = (next_reset - now).total_seconds()
-        
-        if wait_time < 0:
-            wait_time += 7 * 24 * 60 * 60
 
+        # Среда — это weekday = 2
+        days_until_wednesday = (2 - now.weekday() + 7) % 7
+        if days_until_wednesday == 0:
+            days_until_wednesday = 7  # если сегодня среда, ждем следующую
+
+        next_reset = datetime.combine((now + timedelta(days=days_until_wednesday)).date(), datetime.min.time())
+        wait_time = (next_reset - now).total_seconds()
+
+        print(f"⏳ Ожидание до следующей среды: {wait_time // 3600:.0f}ч {(wait_time % 3600) // 60:.0f}м")
         await asyncio.sleep(wait_time)
 
         try:
+            print("🔄 Запуск еженедельного сброса...")
+
             # Получаем текущий cycle_number
             row = supabase.table("weekly_voice_stats").select("cycle_number").order("cycle_number", desc=True).limit(1).execute()
             cycle_number = row.data[0]["cycle_number"] if row.data else 0
 
             # Подсчет недель в текущем цикле
             week_data = supabase.table("weekly_voice_stats") \
-              .select("week_number") \
-              .eq("cycle_number", cycle_number) \
-              .order("week_number", desc=True) \
-              .limit(1) \
-              .execute()
+                .select("week_number") \
+                .eq("cycle_number", cycle_number) \
+                .order("week_number", desc=True) \
+                .limit(1) \
+                .execute()
 
-            if week_data.data:
-              max_week_number = week_data.data[0]["week_number"]
-            else:
-              max_week_number = 0
+            max_week_number = week_data.data[0]["week_number"] if week_data.data else 0
 
             if max_week_number >= 12:
-              cycle_number += 1
-              max_week_number = 0
-            
+                cycle_number += 1
+                max_week_number = 0
 
             # Получаем данные voice_time
             voice_time_rows = supabase.table("voice_time").select("user_id", "total_seconds").execute()
@@ -855,24 +856,13 @@ async def weekly_reset():
             await generate_and_send_graph(bot, channel_id=1373789452463243314, cycle_number=cycle_number)
 
             # Очищаем voice_time
-            response = supabase.table("voice_time").update({"total_seconds": 0}).neq("user_id", -1).execute()
+            supabase.table("voice_time").update({"total_seconds": 0}).neq("user_id", -1).execute()
 
             print("📅 Статистика по времени в голосовых сброшена!")
 
         except Exception as e:
             print(f"❌ Ошибка при сбросе статистики: {e}")
 
-@bot.event
-async def on_ready():
-    init_db()  # Подключение или проверка базы
-    bot.loop.create_task(weekly_reset())  # Запуск задачи сброса
-    print(f"✅ Бот запущен как {bot.user}")
-
-    try:
-        test = supabase.table("voice_time").select("*").limit(1).execute()
-        print("🟢 Подключение к Supabase успешно!")
-    except Exception as e:
-        print("❌ Ошибка подключения к Supabase:", e)
 
 #//////////////////////////////////////
 token = os.getenv("TOKEN")
