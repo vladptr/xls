@@ -866,6 +866,17 @@ async def weekly_reset():
 
 #//////////////////////////////////////
 token = os.getenv("TOKEN")
+
+@bot.event
+async def on_ready():
+    init_db()
+    print(f"✅ Бот запущен как {bot.user}")
+
+    if not hasattr(bot, "weekly_task_started"):
+        bot.loop.create_task(weekly_reset())
+        bot.weekly_task_started = True
+        print("🕒 Задача weekly_reset() запущена.")
+
 async def main():
     keep_alive()
     await bot.start(token)
