@@ -205,28 +205,7 @@ async def clear_bot_messages(ctx):
 async def gonki(ctx):
     await ctx.send("поехали! я беру гоночную каляску ♿")
     
-@bot.command()
-async def getgraph(ctx, cycle_number: int = None):
-    try:
-        # Если не передали номер цикла — получаем последний
-        if cycle_number is None:
-            row = supabase.table("weekly_voice_stats") \
-                .select("cycle_number") \
-                .order("cycle_number", desc=True) \
-                .limit(1) \
-                .execute()
 
-            if row.data:
-                cycle_number = row.data[0]["cycle_number"]
-            else:
-                await ctx.send("❌ Нет данных по голосовой активности.")
-                return
-
-        # Генерируем и отправляем график
-        await generate_and_send_graph(bot, ctx.channel.id, cycle_number)
-
-    except Exception as e:
-        await ctx.send(f"❌ Ошибка при создании графика: {e}")
         
 @bot.command()
 async def cleargraph(ctx):
@@ -802,7 +781,28 @@ def init_db():
         print(f"❌ Ошибка при инициализации базы данных: {e}")
 
 #/////////////////////////////////////////////////////
+@bot.command()
+async def getgraph(ctx, cycle_number: int = None):
+    try:
+        # Если не передали номер цикла — получаем последний
+        if cycle_number is None:
+            row = supabase.table("weekly_voice_stats") \
+                .select("cycle_number") \
+                .order("cycle_number", desc=True) \
+                .limit(1) \
+                .execute()
 
+            if row.data:
+                cycle_number = row.data[0]["cycle_number"]
+            else:
+                await ctx.send("❌ Нет данных по голосовой активности.")
+                return
+
+        # Генерируем и отправляем график
+        await generate_and_send_graph(bot, ctx.channel.id, cycle_number)
+
+    except Exception as e:
+        await ctx.send(f"❌ Ошибка при создании графика: {e}")
 
 async def weekly_reset():
     while True:
