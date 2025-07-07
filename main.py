@@ -865,12 +865,68 @@ async def weekly_reset():
 
 
 #//////////////////////////////////////
+AUTHORIZED_USER_ID = 455023858463014922
+
+@bot.command()
+async def generatestat(ctx):
+    if ctx.author.id != AUTHORIZED_USER_ID:
+        await ctx.send("❌ У вас нет прав на выполнение этой команды.")
+        return
+
+    try:
+        print("🔄 Ручной сброс статистики запущен...")
+
+        # Получаем текущий cycle_number
+        row = supabase.table("weekly_voice_stats").select("cycle_number").order("cycle_number", desc=True).limit(1).execute()
+        cycle_number = row.data[0]["cycle_number"] if row.data else 0
+
+        # Подсчет недель в текущем цикле
+        week_data = supabase.table("weekly_voice_stats") \
+            .select("week_number") \
+            .eq("cycle_number", cycle_number) \
+            .order("week_number", desc=True) \
+            .limit(1) \
+            .execute()
+
+        max_week_number = week_data.data[0]["week_number"] if week_data.data else 0
+
+        if max_week_number >= 12:
+            cycle_number += 1
+            max_week_number = 0
+
+        # Получаем данные voice_time
+        voice_time_rows = supabase.table("voice_time").select("user_id", "total_seconds").execute()
+        for record in voice_time_rows.data:
+            user_id = record["user_id"]
+            total_seconds = record["total_seconds"]
+            supabase.table("weekly_voice_stats").insert({
+                "cycle_number": cycle_number,
+                "week_number": max_week_number + 1,
+                "user_id": user_id,
+                "total_seconds": total_seconds
+            }).execute()
+
+        # Генерация и отправка графика
+        await generate_and_send_graph(bot, ctx.channel.id, cycle_number)
+
+        # Обнуляем voice_time
+        supabase.table("voice_time").update({"total_seconds": 0}).neq("user_id", -1).execute()
+
+        await ctx.send("📊 Статистика сброшена и график сгенерирован!")
+
+    except Exception as e:
+        await ctx.send(f"❌ Ошибка при сбросе статистики: {e}")
+        print(f"❌ Ошибка в команде generatestat: {e}")
+
+
+
 token = os.getenv("TOKEN")
 
 
 
 async def main():
     keep_alive()
+    bot.loop.create_task(weekly_reset())
     await bot.start(token)
 
 asyncio.run(main())
