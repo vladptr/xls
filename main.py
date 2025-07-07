@@ -926,7 +926,7 @@ token = os.getenv("TOKEN")
 
 async def main():
     keep_alive()
-    bot.loop.create_task(weekly_reset())
+    asyncio.create_task(weekly_reset())
     await bot.start(token)
 
 asyncio.run(main())
