@@ -914,22 +914,21 @@ async def stat(ctx, member: discord.Member = None):
         member = member or ctx.author
         user_id = member.id
 
-        # Получаем уровень и опыт
+        # Получение данных пользователя из базы
         row = supabase.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
         stats = row.data[0] if row.data else {"exp": 0, "level": 1}
         level = stats["level"]
         exp = stats["exp"]
 
-        # Берем все записи по user_id из weekly_voice_stats
-        voice_rows = supabase.table("weekly_voice_stats").select("total_seconds").eq("user_id", user_id).execute()
-        total_seconds = sum(r["total_seconds"] for r in voice_rows.data)
+        # Получаем голосовое время (пример)
+        time_row = supabase.table("voice_time").select("total_seconds").eq("user_id", user_id).execute()
+        total_seconds = sum(r["total_seconds"] for r in time_row.data) if time_row.data else 0
         total_hours = total_seconds / 3600
-        weeks_count = len(voice_rows.data)
-        avg_hours = total_hours / max(weeks_count, 1)
+        avg_hours = total_hours / max(len(time_row.data), 1) if time_row.data else 0
 
         # Выбор фона
         if level <= 5:
-            background = "lvl1-5.png"
+            background = "lvl1-5.gif"
         elif level <= 10:
             background = "images/bg2.png"
         elif level <= 25:
@@ -937,33 +936,67 @@ async def stat(ctx, member: discord.Member = None):
         else:
             background = "images/bg4.png"
 
+        # Если файл фона не найден — создаём черный фон
         if not os.path.exists(background):
             img = Image.new("RGBA", (800, 500), (0, 0, 0, 255))
         else:
             img = Image.open(background).convert("RGBA")
 
         draw = ImageDraw.Draw(img)
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 40)
+        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        font = ImageFont.truetype(font_path, 40)
+        small_font = ImageFont.truetype(font_path, 25)
 
-        draw.text((50, 50), f"{member.display_name}", font=font, fill="white")
-        draw.text((50, 120), f"Уровень: {level}", font=font, fill="white")
-        draw.text((50, 190), f"Опыт: {exp}", font=font, fill="white")
-        draw.text((50, 260), f"Среднее время: {avg_hours:.1f} ч", font=font, fill="white")
-        total_text = f"Общее: {total_hours/24:.1f} дн" if total_hours >= 10000 else f"Общее: {total_hours:.0f} ч"
-        draw.text((50, 330), total_text, font=font, fill="white")
+        width, height = img.size
 
+        # Параметры шкалы
+        bar_height = 10
+        margin = 20
+        bar_y = height - bar_height - margin
+
+        # Прогресс-бар
         next_level_exp = get_next_level_exp(level)
         progress = min(exp / next_level_exp, 1.0)
-        bar_x, bar_y, bar_w, bar_h = 50, 400, 400, 40
-        draw.rectangle([bar_x, bar_y, bar_x+bar_w, bar_y+bar_h], outline="white", width=3)
-        draw.rectangle([bar_x, bar_y, bar_x+int(bar_w*progress), bar_y+bar_h], fill="green")
+        bar_width = width - 2 * margin
+        progress_width = int(bar_width * progress)
 
+        # Рисуем прогресс-бар (фон и заполнение)
+        draw.rectangle([margin, bar_y, margin + bar_width, bar_y + bar_height], fill=(100, 100, 100, 180))
+        draw.rectangle([margin, bar_y, margin + progress_width, bar_y + bar_height], fill=(0, 255, 0, 220))
+
+        # Текст слева: имя пользователя над шкалой, с выравниванием по левому краю
+        name_y = bar_y - 45
+        draw.text((margin, name_y), member.display_name, font=font, fill="white")
+
+        # Текст справа: среднее время, общее время, уровень — в один ряд, выравнивание по правому краю
+        avg_time_str = f"Среднее: {avg_hours:.1f} ч"
+        total_time_str = f"Общее: {total_hours:.0f} ч"
+        level_str = f"Уровень: {level}"
+
+        right_text = f"{avg_time_str}   {total_time_str}   {level_str}"
+
+        # Размер текста, чтобы позиционировать справа с отступом
+        text_width, text_height = draw.textsize(right_text, font=small_font)
+        right_x = width - margin - text_width
+        right_y = name_y + 8  # чуть ниже имени
+
+        draw.text((right_x, right_y), right_text, font=small_font, fill="white")
+
+        # Текст под шкалой справа: опыт (например "Опыт: 123 / 150")
+        exp_str = f"Опыт: {exp} / {next_level_exp}"
+        exp_text_width, _ = draw.textsize(exp_str, font=small_font)
+        exp_x = width - margin - exp_text_width
+        exp_y = bar_y + bar_height + 5
+        draw.text((exp_x, exp_y), exp_str, font=small_font, fill="white")
+
+        # Сохраняем и отправляем
         filename = f"stat_{user_id}.png"
         img.save(filename)
         await ctx.send(file=discord.File(filename))
 
     except Exception as e:
         await ctx.send(f"❌ Ошибка в команде stat: {e}")
+
 
 @bot.command()
 async def setexp(ctx, member: discord.Member = None):
