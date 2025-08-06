@@ -918,7 +918,7 @@ async def stat(ctx, member: discord.Member = None):
 
         # Выбор фона
         if level <= 5:
-            background = "lvl1-5.gif"
+            background = "lvl1-5.png"
         elif level <= 10:
             background = "images/bg2.png"
         elif level <= 25:
