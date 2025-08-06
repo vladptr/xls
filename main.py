@@ -949,6 +949,24 @@ async def stat(ctx, member: discord.Member = None):
     img.save(filename)
     await ctx.send(file=discord.File(filename))
 
+@bot.command()
+async def setexp(ctx, member: discord.Member = None):
+    # Проверка ID автора
+    if ctx.author.id != 455023858463014922:
+        await ctx.send("❌ У вас нет прав на использование этой команды.")
+        return
+
+    # Если не указали пользователя, по умолчанию автор
+    member = member or ctx.author
+    user_id = member.id
+
+    try:
+        # Добавляем опыт
+        update_experience(user_id, 10)
+        await ctx.send(f"✅ Пользователю {member.display_name} начислено +10 опыта!")
+    except Exception as e:
+        await ctx.send(f"❌ Ошибка при начислении опыта: {e}")
+
 #//////////////////////////////////////
 AUTHORIZED_USER_ID = 455023858463014922
 
