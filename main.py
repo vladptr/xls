@@ -906,18 +906,19 @@ async def stat(ctx, member: discord.Member = None):
         # Получаем уровень и опыт
         row = supabase.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
         stats = row.data[0] if row.data else {"exp": 0, "level": 1}
-        level = stats.get("level", 1)
-        exp = stats.get("exp", 0)
+        level = stats["level"]
+        exp = stats["exp"]
 
-        # Голосовая статистика
-        time_row = supabase.table("voice_time_history").select("total_seconds").eq("user_id", user_id).execute()
-        total_seconds = sum(r["total_seconds"] for r in time_row.data) if time_row.data else 0
+        # Берем все записи по user_id из weekly_voice_stats
+        voice_rows = supabase.table("weekly_voice_stats").select("total_seconds").eq("user_id", user_id).execute()
+        total_seconds = sum(r["total_seconds"] for r in voice_rows.data)
         total_hours = total_seconds / 3600
-        avg_hours = (total_hours / len(time_row.data)) if time_row.data else 0
+        weeks_count = len(voice_rows.data)
+        avg_hours = total_hours / max(weeks_count, 1)
 
-        # Фон
+        # Выбор фона
         if level <= 5:
-            background = "images/bg1.png"
+            background = "lvl1-5.gif"
         elif level <= 10:
             background = "images/bg2.png"
         elif level <= 25:
@@ -926,44 +927,29 @@ async def stat(ctx, member: discord.Member = None):
             background = "images/bg4.png"
 
         if not os.path.exists(background):
-            img = Image.new("RGBA", (900, 500), (30, 30, 30, 255))
+            img = Image.new("RGBA", (800, 500), (0, 0, 0, 255))
         else:
             img = Image.open(background).convert("RGBA")
 
         draw = ImageDraw.Draw(img)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 40)
 
-        # Шрифт
-        try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 40)
-        except:
-            font = ImageFont.load_default()
-
-        # Имя
-        display_name = member.display_name[:18]  # ограничение длины
-        draw.text((50, 40), f"{display_name}", font=font, fill="white")
-
-        # Статистика
+        draw.text((50, 50), f"{member.display_name}", font=font, fill="white")
         draw.text((50, 120), f"Уровень: {level}", font=font, fill="white")
-        draw.text((50, 180), f"Опыт: {exp}", font=font, fill="white")
-        draw.text((50, 240), f"Среднее: {avg_hours:.1f} ч", font=font, fill="white")
-        total_text = f"Общее: {total_hours:.0f} ч" if total_hours < 10000 else f"Общее: {total_hours/24:.1f} дн"
-        draw.text((50, 300), total_text, font=font, fill="white")
+        draw.text((50, 190), f"Опыт: {exp}", font=font, fill="white")
+        draw.text((50, 260), f"Среднее время: {avg_hours:.1f} ч", font=font, fill="white")
+        total_text = f"Общее: {total_hours/24:.1f} дн" if total_hours >= 10000 else f"Общее: {total_hours:.0f} ч"
+        draw.text((50, 330), total_text, font=font, fill="white")
 
-        # Прогресс-бар
         next_level_exp = get_next_level_exp(level)
         progress = min(exp / next_level_exp, 1.0)
-        bar_x, bar_y, bar_w, bar_h = 50, 380, 400, 40
+        bar_x, bar_y, bar_w, bar_h = 50, 400, 400, 40
         draw.rectangle([bar_x, bar_y, bar_x+bar_w, bar_y+bar_h], outline="white", width=3)
-        draw.rectangle([bar_x, bar_y, bar_x+int(bar_w*progress), bar_y+bar_h], fill=(0, 200, 0))
+        draw.rectangle([bar_x, bar_y, bar_x+int(bar_w*progress), bar_y+bar_h], fill="green")
 
-        # Подпись уровня над шкалой
-        draw.text((bar_x + bar_w + 20, bar_y), f"Next: {next_level_exp}", font=font, fill="white")
-
-        # Сохраняем и отправляем
         filename = f"stat_{user_id}.png"
         img.save(filename)
         await ctx.send(file=discord.File(filename))
-        os.remove(filename)
 
     except Exception as e:
         await ctx.send(f"❌ Ошибка в команде stat: {e}")
