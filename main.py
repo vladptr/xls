@@ -926,13 +926,13 @@ async def stat(ctx, member: discord.Member = None):
         avg_hours = total_hours / max(len(time_row.data), 1) if time_row.data else 0
 
         # Загружаем фон GIF
-        gif_path = "lvl1-5.gif"
+        gif_path = "background.gif"
         gif = Image.open(gif_path)
         frames = []
 
         # Шрифты
-        font = ImageFont.truetype("fluffyfont.ttf", 70)
-        small_font = ImageFont.truetype("fluffyfont.ttf", 40)
+        font = ImageFont.truetype("FluffyFont.ttf", 70)
+        small_font = ImageFont.truetype("FluffyFont.ttf", 40)
 
         width, height = gif.size
         margin = 10
@@ -949,32 +949,35 @@ async def stat(ctx, member: discord.Member = None):
         progress = min(exp / next_level_exp, 1.0)
         progress_w = int(bar_w * progress)
 
-        # Функция для градиента (тонкая линия)
-        def create_gradient_line(width, height):
+        # Функция для градиента (заливка прогресса)
+        def create_gradient_bar(width, height):
             gradient = Image.new("RGBA", (width, height))
             for x in range(width):
                 ratio = x / width
-                r = 255 - int(255 * ratio)  # желто-черный градиент
+                # Жёлтый (255,255,0) -> чёрный (0,0,0)
+                r = 255 - int(255 * ratio)
                 g = 255 - int(255 * ratio)
                 b = 0
-                gradient.putpixel((x, 0), (r, g, b, 255))
-            return gradient.resize((width, height))
+                for y in range(height):
+                    gradient.putpixel((x, y), (r, g, b, 255))
+            return gradient
 
         try:
             while True:
                 frame = gif.copy().convert("RGBA")
                 draw = ImageDraw.Draw(frame)
 
-                # Серая полоса внизу
+                # Серая полоса с обводкой
                 draw.rounded_rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_height],
                                         radius=bar_radius, fill=(60, 60, 60, 200), outline="black", width=3)
 
-                # Тонкая прогресс-линия над шкалой
+                # Заливка прогресса градиентом
                 if progress_w > 0:
-                    line_height = 8  # толщина тонкой линии
-                    line_y = bar_y - line_height - 5  # над шкалой
-                    gradient_line = create_gradient_line(progress_w, line_height)
-                    frame.paste(gradient_line, (bar_x, line_y), gradient_line)
+                    gradient_bar = create_gradient_bar(progress_w, bar_height)
+                    mask = Image.new("L", (progress_w, bar_height), 0)
+                    mask_draw = ImageDraw.Draw(mask)
+                    mask_draw.rounded_rectangle([0, 0, progress_w, bar_height], radius=bar_radius, fill=255)
+                    frame.paste(gradient_bar, (bar_x, bar_y), mask)
 
                 # Имя пользователя (с обводкой)
                 name_y = bar_y - 90
