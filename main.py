@@ -984,7 +984,7 @@ async def stat(ctx, member: discord.Member = None):
         exp_y = bar_y + bar_height + 5
         draw.text((exp_x, exp_y), exp_str, font=small_font, fill="white")
 
-        filename = f"stat_{user_id}.jpg"
+        filename = f"stat_{user_id}.png"
         img.save(filename)
         await ctx.send(file=discord.File(filename))
 
