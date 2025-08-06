@@ -898,6 +898,16 @@ def calculate_level(exp):
     else:  # 26+
         return 25 + (exp - 1875) // 150 + 1
 
+def get_next_level_exp(level: int) -> int:
+    if level < 5:
+        return 25 * level
+    elif level < 10:
+        return 125 + 50 * (level - 5)
+    elif level < 25:
+        return 375 + 100 * (level - 10)
+    else:
+        return 1875 + 150 * (level - 25)
+
 @bot.command()
 async def stat(ctx, member: discord.Member = None):
     try:
