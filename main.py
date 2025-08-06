@@ -926,7 +926,7 @@ async def stat(ctx, member: discord.Member = None):
         avg_hours = total_hours / max(len(time_row.data), 1) if time_row.data else 0
 
         # GIF фон
-        gif_path = "background.gif"
+        gif_path = "lvl1-5.gif"
         gif = Image.open(gif_path)
         frames = []
 
