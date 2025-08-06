@@ -925,7 +925,7 @@ async def stat(ctx, member: discord.Member = None):
         avg_hours = total_hours / max(len(time_row.data), 1) if time_row.data else 0
 
         if level <= 5:
-            background = "lvl1-5.png"
+            background = "lvl1-5.jpg"
         elif level <= 10:
             background = "images/bg2.png"
         elif level <= 25:
@@ -984,7 +984,7 @@ async def stat(ctx, member: discord.Member = None):
         exp_y = bar_y + bar_height + 5
         draw.text((exp_x, exp_y), exp_str, font=small_font, fill="white")
 
-        filename = f"stat_{user_id}.png"
+        filename = f"stat_{user_id}.jpg"
         img.save(filename)
         await ctx.send(file=discord.File(filename))
 
