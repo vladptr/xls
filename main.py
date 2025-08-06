@@ -931,8 +931,8 @@ async def stat(ctx, member: discord.Member = None):
         frames = []
 
         # Подключаем шрифт FluffyFont
-        font = ImageFont.truetype("FluffyFont.ttf", 70)
-        small_font = ImageFont.truetype("FluffyFont.ttf", 40)
+        font = ImageFont.truetype("fluffyfont.ttf", 70)
+        small_font = ImageFont.truetype("fluffyfont.ttf", 40)
 
         width, height = gif.size
         margin = 10
