@@ -807,44 +807,55 @@ async def getgraph(ctx, cycle_number: int = None):
 async def weekly_reset():
     while True:
         now = datetime.utcnow()
-
-        # Среда — это weekday = 2
         days_until_wednesday = (2 - now.weekday() + 7) % 7
         if days_until_wednesday == 0:
-            days_until_wednesday = 7  # если сегодня среда, ждем следующую
-
+            days_until_wednesday = 7
         next_reset = datetime.combine((now + timedelta(days=days_until_wednesday)).date(), datetime.min.time())
         wait_time = (next_reset - now).total_seconds()
-
         print(f"⏳ Ожидание до следующей среды: {wait_time // 3600:.0f}ч {(wait_time % 3600) // 60:.0f}м")
         await asyncio.sleep(wait_time)
 
         try:
             print("🔄 Запуск еженедельного сброса...")
-
-            # Получаем текущий cycle_number
             row = supabase.table("weekly_voice_stats").select("cycle_number").order("cycle_number", desc=True).limit(1).execute()
             cycle_number = row.data[0]["cycle_number"] if row.data else 0
-
-            # Подсчет недель в текущем цикле
-            week_data = supabase.table("weekly_voice_stats") \
-                .select("week_number") \
-                .eq("cycle_number", cycle_number) \
-                .order("week_number", desc=True) \
-                .limit(1) \
-                .execute()
-
+            week_data = supabase.table("weekly_voice_stats").select("week_number").eq("cycle_number", cycle_number).order("week_number", desc=True).limit(1).execute()
             max_week_number = week_data.data[0]["week_number"] if week_data.data else 0
-
             if max_week_number >= 12:
                 cycle_number += 1
                 max_week_number = 0
 
-            # Получаем данные voice_time
             voice_time_rows = supabase.table("voice_time").select("user_id", "total_seconds").execute()
+
+            user_times = []
             for record in voice_time_rows.data:
                 user_id = record["user_id"]
                 total_seconds = record["total_seconds"]
+                user_times.append((user_id, total_seconds))
+
+            # Сортируем по времени
+            user_times.sort(key=lambda x: x[1], reverse=True)
+
+            # Начисление опыта
+            for i, (user_id, total_seconds) in enumerate(user_times):
+                if total_seconds < 60:  # меньше минуты - без опыта
+                    continue
+
+                if i == 0:
+                    exp = 10
+                elif i in [1, 2]:
+                    exp = 8
+                elif 3 <= i <= 6:
+                    exp = 6
+                elif 7 <= i <= 9:
+                    exp = 4
+                else:
+                    exp = 2
+
+                # Обновляем опыт
+                update_experience(user_id, exp)
+
+                # Сохраняем статистику
                 supabase.table("weekly_voice_stats").insert({
                     "cycle_number": cycle_number,
                     "week_number": max_week_number + 1,
@@ -863,6 +874,80 @@ async def weekly_reset():
         except Exception as e:
             print(f"❌ Ошибка при сбросе статистики: {e}")
 
+def update_experience(user_id, added_exp):
+    row = supabase.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
+    if row.data:
+        exp = row.data[0]["exp"] + added_exp
+        level = calculate_level(exp)
+        supabase.table("user_levels").update({"exp": exp, "level": level}).eq("user_id", user_id).execute()
+    else:
+        supabase.table("user_levels").insert({
+            "user_id": user_id,
+            "exp": added_exp,
+            "level": calculate_level(added_exp)
+        }).execute()
+
+def calculate_level(exp):
+    if exp < 125:  # 1-5 уровни по 25
+        return exp // 25 + 1
+    elif exp < 375:  # 6-10 уровни по 50
+        return 5 + (exp - 125) // 50 + 1
+    elif exp < 1875:  # 11-25 уровни по 100
+        return 10 + (exp - 375) // 100 + 1
+    else:  # 26+
+        return 25 + (exp - 1875) // 150 + 1
+
+@bot.command()
+async def stat(ctx, member: discord.Member = None):
+    member = member or ctx.author
+    user_id = member.id
+
+    # Получаем данные
+    row = supabase.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
+    stats = row.data[0] if row.data else {"exp": 0, "level": 1}
+    level = stats["level"]
+    exp = stats["exp"]
+
+    # Общие часы
+    time_row = supabase.table("voice_time_history").select("total_seconds").eq("user_id", user_id).execute()
+    total_seconds = sum(r["total_seconds"] for r in time_row.data)
+    total_hours = total_seconds / 3600
+    avg_hours = total_hours / max(len(time_row.data), 1)
+
+    # Выбор фона
+    if level <= 5:
+        background = "lvl1-5.gif"
+    elif level <= 10:
+        background = "images/bg2.png"
+    elif level <= 25:
+        background = "images/bg3.png"
+    else:
+        background = "images/bg4.png"
+
+    # Рисуем картинку
+    from PIL import Image, ImageDraw, ImageFont
+    img = Image.open(background).convert("RGBA")
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.truetype("arial.ttf", 40)
+
+    draw.text((50, 50), f"{member.display_name}", font=font, fill="white")
+    draw.text((50, 120), f"Уровень: {level}", font=font, fill="white")
+    draw.text((50, 190), f"Опыт: {exp}", font=font, fill="white")
+    draw.text((50, 260), f"Среднее время: {avg_hours:.1f} ч", font=font, fill="white")
+    total_text = f"Общее: {total_hours/24:.1f} дн" if total_hours >= 10000 else f"Общее: {total_hours:.0f} ч"
+    draw.text((50, 330), total_text, font=font, fill="white")
+
+    # Прогресс-бар
+    next_level_exp = get_next_level_exp(level)
+    progress = min(exp / next_level_exp, 1.0)
+    bar_x, bar_y, bar_w, bar_h = 50, 400, 400, 40
+    draw.rectangle([bar_x, bar_y, bar_x+bar_w, bar_y+bar_h], outline="white", width=3)
+    draw.rectangle([bar_x, bar_y, bar_x+int(bar_w*progress), bar_y+bar_h], fill="green")
+
+    # Сохраняем и отправляем
+    filename = f"stat_{user_id}.png"
+    img.save(filename)
+    await ctx.send(file=discord.File(filename))
 
 #//////////////////////////////////////
 AUTHORIZED_USER_ID = 455023858463014922
