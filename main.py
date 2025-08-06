@@ -926,13 +926,13 @@ async def stat(ctx, member: discord.Member = None):
         avg_hours = total_hours / max(len(time_row.data), 1) if time_row.data else 0
 
         # Загружаем фон GIF
-        gif_path = "background.gif"
+        gif_path = "lvl1-5.gif"
         gif = Image.open(gif_path)
         frames = []
 
         # Шрифты
-        font = ImageFont.truetype("FluffyFont.ttf", 70)
-        small_font = ImageFont.truetype("FluffyFont.ttf", 40)
+        font = ImageFont.truetype("fluffyfont.ttf", 70)
+        small_font = ImageFont.truetype("fluffyfont.ttf", 40)
 
         width, height = gif.size
         margin = 10
