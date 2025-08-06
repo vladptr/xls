@@ -769,7 +769,7 @@ async def generate_and_send_graph(bot, channel_id, cycle_number):
         print("Канал не найден.")
 
     # Загружаем на Google Drive
-    await upload_to_google_drive(filename, folder_id='1XXjk7oPlijNDSLoiCf2DayVmOMRX-gyK')
+    #await upload_to_google_drive(filename, folder_id='1XXjk7oPlijNDSLoiCf2DayVmOMRX-gyK')
 
 #/////////////////////////////////////////////////////
 
