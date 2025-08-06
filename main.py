@@ -914,19 +914,16 @@ async def stat(ctx, member: discord.Member = None):
         member = member or ctx.author
         user_id = member.id
 
-        # Получение данных пользователя из базы
         row = supabase.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
         stats = row.data[0] if row.data else {"exp": 0, "level": 1}
         level = stats["level"]
         exp = stats["exp"]
 
-        # Получаем голосовое время (пример)
         time_row = supabase.table("voice_time").select("total_seconds").eq("user_id", user_id).execute()
         total_seconds = sum(r["total_seconds"] for r in time_row.data) if time_row.data else 0
         total_hours = total_seconds / 3600
         avg_hours = total_hours / max(len(time_row.data), 1) if time_row.data else 0
 
-        # Выбор фона
         if level <= 5:
             background = "lvl1-5.gif"
         elif level <= 10:
@@ -936,7 +933,6 @@ async def stat(ctx, member: discord.Member = None):
         else:
             background = "images/bg4.png"
 
-        # Если файл фона не найден — создаём черный фон
         if not os.path.exists(background):
             img = Image.new("RGBA", (800, 500), (0, 0, 0, 255))
         else:
@@ -949,47 +945,45 @@ async def stat(ctx, member: discord.Member = None):
 
         width, height = img.size
 
-        # Параметры шкалы
+        # Настроим размеры и положение шкалы
+        margin = 10
         bar_height = 10
-        margin = 20
         bar_y = height - bar_height - margin
+        bar_x = margin
+        bar_w = width - 2 * margin
 
-        # Прогресс-бар
         next_level_exp = get_next_level_exp(level)
         progress = min(exp / next_level_exp, 1.0)
-        bar_width = width - 2 * margin
-        progress_width = int(bar_width * progress)
+        progress_w = int(bar_w * progress)
 
-        # Рисуем прогресс-бар (фон и заполнение)
-        draw.rectangle([margin, bar_y, margin + bar_width, bar_y + bar_height], fill=(100, 100, 100, 180))
-        draw.rectangle([margin, bar_y, margin + progress_width, bar_y + bar_height], fill=(0, 255, 0, 220))
+        # Отрисовка прогресс-бара
+        draw.rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_height], fill=(100, 100, 100, 180))  # фон
+        draw.rectangle([bar_x, bar_y, bar_x + progress_w, bar_y + bar_height], fill=(0, 255, 0, 220))  # заполнение
 
-        # Текст слева: имя пользователя над шкалой, с выравниванием по левому краю
+        # Имя слева над шкалой
         name_y = bar_y - 45
-        draw.text((margin, name_y), member.display_name, font=font, fill="white")
+        draw.text((bar_x, name_y), member.display_name, font=font, fill="white")
 
-        # Текст справа: среднее время, общее время, уровень — в один ряд, выравнивание по правому краю
+        # Правый текст (среднее время, общее время, уровень) в один ряд справа над шкалой
         avg_time_str = f"Среднее: {avg_hours:.1f} ч"
         total_time_str = f"Общее: {total_hours:.0f} ч"
         level_str = f"Уровень: {level}"
-
         right_text = f"{avg_time_str}   {total_time_str}   {level_str}"
 
-        # Размер текста, чтобы позиционировать справа с отступом
-        text_width, text_height = draw.textsize(right_text, font=small_font)
-        right_x = width - margin - text_width
-        right_y = name_y + 8  # чуть ниже имени
-
+        bbox = draw.textbbox((0, 0), right_text, font=small_font)
+        text_w = bbox[2] - bbox[0]
+        right_x = width - margin - text_w
+        right_y = name_y + 8
         draw.text((right_x, right_y), right_text, font=small_font, fill="white")
 
-        # Текст под шкалой справа: опыт (например "Опыт: 123 / 150")
+        # Опыт под шкалой справа
         exp_str = f"Опыт: {exp} / {next_level_exp}"
-        exp_text_width, _ = draw.textsize(exp_str, font=small_font)
-        exp_x = width - margin - exp_text_width
+        exp_bbox = draw.textbbox((0, 0), exp_str, font=small_font)
+        exp_w = exp_bbox[2] - exp_bbox[0]
+        exp_x = width - margin - exp_w
         exp_y = bar_y + bar_height + 5
         draw.text((exp_x, exp_y), exp_str, font=small_font, fill="white")
 
-        # Сохраняем и отправляем
         filename = f"stat_{user_id}.png"
         img.save(filename)
         await ctx.send(file=discord.File(filename))
