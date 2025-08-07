@@ -909,6 +909,13 @@ def get_next_level_exp(level: int) -> int:
     else:
         return 1875 + 150 * (level - 25)
 
+def get_total_exp_before(level):
+    total = 0
+    for l in range(1, level):
+        total += get_next_level_exp(l)
+    return total
+
+
 @bot.command()
 async def stat(ctx, member: discord.Member = None):
     try:
@@ -968,7 +975,9 @@ async def stat(ctx, member: discord.Member = None):
         radius = avatar_width // 2 + 5
         thickness = 4
         next_level_exp = get_next_level_exp(level)
-        progress = min(exp / next_level_exp, 1.0)
+        exp_on_this_level = exp - get_total_exp_before(level)
+        next_level_exp = get_next_level_exp(level)
+        progress = min(max(exp_on_this_level / next_level_exp, 0), 1.0)
         start_angle = -90
         end_angle = start_angle + int(360 * progress)
 
@@ -994,7 +1003,7 @@ async def stat(ctx, member: discord.Member = None):
         draw.text((text_x, avatar_y + line_height * 1), f"Среднее: {avg_hours:.1f} ч", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
         draw.text((text_x, avatar_y + line_height * 2), f"Общее: {total_hours:.1f} ч", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
         draw.text((text_x, avatar_y + line_height * 3), f"Уровень: {level}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
-        draw.text((text_x, avatar_y + line_height * 4), f"Опыт: {exp} / {next_level_exp}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((text_x, avatar_y + line_height * 4), f"Опыт: {exp_on_this_level} / {next_level_exp}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
 
         filename = f"stat_{user_id}.png"
