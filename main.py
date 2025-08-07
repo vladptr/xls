@@ -941,7 +941,7 @@ async def stat(ctx, member: discord.Member = None):
         width, height = img.size
 
         # Настройка шрифтов
-        font_path = "FluffyFont.ttf"
+        font_path = "FluffyFont.otf"
         name_font = ImageFont.truetype(font_path, 28)
         small_font = ImageFont.truetype(font_path, 18)
 
