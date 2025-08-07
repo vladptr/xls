@@ -963,9 +963,10 @@ async def stat(ctx, member: discord.Member = None):
         img.paste(avatar, (avatar_x, avatar_y), avatar)
 
         # Отрисовка круговой шкалы опыта вокруг аватарки
-        center = (avatar_x + 80, avatar_y + 80)
-        radius = 90
-        thickness = 5
+        avatar_width, avatar_height = avatar.size
+        center = (avatar_x + avatar_width // 2, avatar_y + avatar_height // 2)
+        radius = avatar_width // 2 + 5
+        thickness = 4
         next_level_exp = get_next_level_exp(level)
         progress = min(exp / next_level_exp, 1.0)
         start_angle = -90
