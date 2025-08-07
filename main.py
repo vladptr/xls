@@ -930,11 +930,11 @@ async def stat(ctx, member: discord.Member = None):
         if level <= 5:
             background_path = "1-5.jpg"
         elif level <= 10:
-            background_path = "5-10.png"
+            background_path = "5-10.jpg"
         elif level <= 25:
-            background_path = "10-25.png"
+            background_path = "10-25.jpg"
         else:
-            background_path = "25+.png"
+            background_path = "25+.jpg"
 
         img = Image.open(background_path).convert("RGBA")
         draw = ImageDraw.Draw(img)
@@ -946,14 +946,16 @@ async def stat(ctx, member: discord.Member = None):
         small_font = ImageFont.truetype(font_path, 18)
 
         # Загружаем аватар пользователя
-        avatar_asset = member.display_avatar.replace(format="png", size=128)
+        avatar_asset = member.avatar or member.display_avatar
         avatar_bytes = await avatar_asset.read()
         avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA")
-        avatar = avatar.resize((160, 160))
-        avatar = ImageOps.fit(avatar, (160, 160), centering=(0.5, 0.5))
-        mask = Image.new("L", (160, 160), 0)
+
+        avatar_size = 160  # базовый размер
+        avatar = avatar.resize((int(avatar_size * 0.85), int(avatar_size * 0.85)))  # -15%
+        avatar = ImageOps.fit(avatar, avatar.size, centering=(0.5, 0.5))
+        mask = Image.new("L", avatar.size, 0)
         draw_mask = ImageDraw.Draw(mask)
-        draw_mask.ellipse((0, 0, 160, 160), fill=255)
+        draw_mask.ellipse((0, 0, avatar.size[0], avatar.size[1]), fill=255)
         avatar.putalpha(mask)
 
         avatar_x = 50
@@ -963,7 +965,7 @@ async def stat(ctx, member: discord.Member = None):
         # Отрисовка круговой шкалы опыта вокруг аватарки
         center = (avatar_x + 80, avatar_y + 80)
         radius = 90
-        thickness = 10
+        thickness = 5
         next_level_exp = get_next_level_exp(level)
         progress = min(exp / next_level_exp, 1.0)
         start_angle = -90
@@ -980,16 +982,19 @@ async def stat(ctx, member: discord.Member = None):
             )
 
         # Имя пользователя
-        name_pos = (230, avatar_y - 20)
-        draw.text(name_pos, member.display_name, font=name_font, fill="white", stroke_width=1, stroke_fill="black")
+        # Центр текстовой информации
+        text_x = 230
+        line_height = 28
 
-        # Информация: среднее, общее, уровень
-        info = f"Среднее: {avg_hours:.1f} ч   Общее: {total_hours:.0f} ч   Уровень: {level}"
-        draw.text((230, avatar_y + 50), info, font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+# Имя пользователя
+        draw.text((text_x, avatar_y - 10), member.display_name, font=name_font, fill="white", stroke_width=1, stroke_fill="black")
 
-        # Опыт под аватаркой
-        exp_str = f"Опыт: {exp} / {next_level_exp}"
-        draw.text((230, avatar_y + 90), exp_str, font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+# Статистика
+        draw.text((text_x, avatar_y + line_height * 1), f"Среднее: {avg_hours:.1f} ч", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((text_x, avatar_y + line_height * 2), f"Общее: {total_hours:.1f} ч", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((text_x, avatar_y + line_height * 3), f"Уровень: {level}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((text_x, avatar_y + line_height * 4), f"Опыт: {exp} / {next_level_exp}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+
 
         filename = f"stat_{user_id}.png"
         img.save(filename)
