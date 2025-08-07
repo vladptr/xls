@@ -1022,12 +1022,22 @@ async def stat(ctx, member: discord.Member = None):
         stat_msg = await ctx.send(file=discord.File(filename))
 
         # Удаление через 3 минуты
-        await asyncio.sleep(180)
-        await stat_msg.delete()
-        os.remove(filename)
+        async def delete_later():
+            await asyncio.sleep(120)
+            try:
+                await stat_msg.delete()
+            except discord.NotFound:
+                pass  # сообщение уже удалено вручную
+            except Exception as e:
+                print(f"❌ Ошибка при удалении сообщения: {e}")
+            try:
+                os.remove(filename)
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                print(f"❌ Ошибка при удалении файла: {e}")
 
-    except Exception as e:
-        await ctx.send(f"❌ Ошибка в команде stat: {e}")
+        bot.loop.create_task(delete_later())
 
 
 @bot.command()
