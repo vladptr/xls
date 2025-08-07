@@ -25,7 +25,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from webserver import keep_alive
 from datetime import datetime, UTC
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+from io import BytesIO
 
 setup_messages = {}
 channel_locks = {}
@@ -941,8 +942,8 @@ async def stat(ctx, member: discord.Member = None):
 
         # Настройка шрифтов
         font_path = "FluffyFont.ttf"
-        name_font = ImageFont.truetype(font_path, 48)
-        small_font = ImageFont.truetype(font_path, 28)
+        name_font = ImageFont.truetype(font_path, 28)
+        small_font = ImageFont.truetype(font_path, 18)
 
         # Загружаем аватар пользователя
         avatar_asset = member.display_avatar.replace(format="png", size=128)
