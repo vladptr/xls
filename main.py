@@ -914,7 +914,7 @@ async def stat(ctx, member: discord.Member = None):
         member = member or ctx.author
         user_id = member.id
 
-        # Получаем статистику
+        # Получение данных из Supabase
         row = supabase.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
         stats = row.data[0] if row.data else {"exp": 0, "level": 1}
         level = stats["level"]
@@ -925,96 +925,73 @@ async def stat(ctx, member: discord.Member = None):
         total_hours = total_seconds / 3600
         avg_hours = total_hours / max(len(time_row.data), 1) if time_row.data else 0
 
-        # Загружаем фон GIF
-        gif_path = "lvl1-5.gif"
-        gif = Image.open(gif_path)
-        frames = []
+        # Выбор фона по уровню
+        if level <= 5:
+            background_path = "1-5.jpg"
+        elif level <= 10:
+            background_path = "5-10.png"
+        elif level <= 25:
+            background_path = "10-25.png"
+        else:
+            background_path = "25+.png"
 
-        # Шрифты
-        font = ImageFont.truetype("fluffyfont.ttf", 70)
-        small_font = ImageFont.truetype("fluffyfont.ttf", 40)
+        img = Image.open(background_path).convert("RGBA")
+        draw = ImageDraw.Draw(img)
+        width, height = img.size
 
-        width, height = gif.size
-        margin = 10
+        # Настройка шрифтов
+        font_path = "FluffyFont.ttf"
+        name_font = ImageFont.truetype(font_path, 48)
+        small_font = ImageFont.truetype(font_path, 28)
 
-        # Основная шкала
-        bar_height = 25
-        bar_y = height - bar_height - margin
-        bar_x = margin
-        bar_w = width - 2 * margin
-        bar_radius = 15
+        # Загружаем аватар пользователя
+        avatar_asset = member.display_avatar.replace(format="png", size=128)
+        avatar_bytes = await avatar_asset.read()
+        avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA")
+        avatar = avatar.resize((160, 160))
+        avatar = ImageOps.fit(avatar, (160, 160), centering=(0.5, 0.5))
+        mask = Image.new("L", (160, 160), 0)
+        draw_mask = ImageDraw.Draw(mask)
+        draw_mask.ellipse((0, 0, 160, 160), fill=255)
+        avatar.putalpha(mask)
 
-        # Прогресс
+        avatar_x = 50
+        avatar_y = height // 2 - 80
+        img.paste(avatar, (avatar_x, avatar_y), avatar)
+
+        # Отрисовка круговой шкалы опыта вокруг аватарки
+        center = (avatar_x + 80, avatar_y + 80)
+        radius = 90
+        thickness = 10
         next_level_exp = get_next_level_exp(level)
         progress = min(exp / next_level_exp, 1.0)
-        progress_w = int(bar_w * progress)
+        start_angle = -90
+        end_angle = start_angle + int(360 * progress)
 
-        # Функция для градиента (заливка прогресса)
-        def create_gradient_bar(width, height):
-            gradient = Image.new("RGBA", (width, height))
-            for x in range(width):
-                ratio = x / width
-                # Жёлтый (255,255,0) -> чёрный (0,0,0)
-                r = 255 - int(255 * ratio)
-                g = 255 - int(255 * ratio)
-                b = 0
-                for y in range(height):
-                    gradient.putpixel((x, y), (r, g, b, 255))
-            return gradient
+        # Градиентная шкала
+        for i in range(start_angle, end_angle):
+            angle_rad = math.radians(i)
+            x = center[0] + radius * math.cos(angle_rad)
+            y = center[1] + radius * math.sin(angle_rad)
+            draw.ellipse(
+                (x - thickness//2, y - thickness//2, x + thickness//2, y + thickness//2),
+                fill=(255, 255 - (i % 255), 0)
+            )
 
-        try:
-            while True:
-                frame = gif.copy().convert("RGBA")
-                draw = ImageDraw.Draw(frame)
+        # Имя пользователя
+        name_pos = (230, avatar_y - 20)
+        draw.text(name_pos, member.display_name, font=name_font, fill="white", stroke_width=1, stroke_fill="black")
 
-                # Серая полоса с обводкой
-                draw.rounded_rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_height],
-                                        radius=bar_radius, fill=(60, 60, 60, 200), outline="black", width=3)
+        # Информация: среднее, общее, уровень
+        info = f"Среднее: {avg_hours:.1f} ч   Общее: {total_hours:.0f} ч   Уровень: {level}"
+        draw.text((230, avatar_y + 50), info, font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
-                # Заливка прогресса градиентом
-                if progress_w > 0:
-                    gradient_bar = create_gradient_bar(progress_w, bar_height)
-                    mask = Image.new("L", (progress_w, bar_height), 0)
-                    mask_draw = ImageDraw.Draw(mask)
-                    mask_draw.rounded_rectangle([0, 0, progress_w, bar_height], radius=bar_radius, fill=255)
-                    frame.paste(gradient_bar, (bar_x, bar_y), mask)
+        # Опыт под аватаркой
+        exp_str = f"Опыт: {exp} / {next_level_exp}"
+        draw.text((230, avatar_y + 90), exp_str, font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
-                # Имя пользователя (с обводкой)
-                name_y = bar_y - 90
-                draw.text((bar_x, name_y), member.display_name, font=font, fill="white",
-                          stroke_width=2, stroke_fill="black")
-
-                # Текст справа (в один ряд)
-                avg_time_str = f"Среднее: {avg_hours:.1f}ч"
-                total_time_str = f"Общее: {total_hours:.0f}ч"
-                level_str = f"Lvl {level}"
-                right_text = f"{avg_time_str}   {total_time_str}   {level_str}"
-
-                bbox = draw.textbbox((0, 0), right_text, font=small_font)
-                text_w = bbox[2] - bbox[0]
-                right_x = width - margin - text_w
-                right_y = name_y + 20
-                draw.text((right_x, right_y), right_text, font=small_font, fill="white",
-                          stroke_width=2, stroke_fill="black")
-
-                # Опыт под шкалой
-                exp_str = f"Опыт: {exp}/{next_level_exp}"
-                exp_bbox = draw.textbbox((0, 0), exp_str, font=small_font)
-                exp_w = exp_bbox[2] - exp_bbox[0]
-                exp_x = width - margin - exp_w
-                exp_y = bar_y + bar_height + 8
-                draw.text((exp_x, exp_y), exp_str, font=small_font, fill="white",
-                          stroke_width=2, stroke_fill="black")
-
-                frames.append(frame)
-                gif.seek(gif.tell() + 1)
-        except EOFError:
-            pass
-
-        # Сохраняем как GIF
-        filename = f"stat_{user_id}.gif"
-        frames[0].save(filename, save_all=True, append_images=frames[1:], duration=gif.info.get('duration', 80), loop=0)
-
+        filename = f"stat_{user_id}.png"
+        img.save(filename)
         await ctx.send(file=discord.File(filename))
 
     except Exception as e:
