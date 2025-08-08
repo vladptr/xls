@@ -931,8 +931,48 @@ def get_total_exp_before(level):
         total += get_next_level_exp(l)
     return total
 
+def get_rank_info(rating):
+    ranks = [
+        ("bronze", 0, 1399),
+        ("silver", 1400, 1799),
+        ("gold", 1800, 2199),
+        ("platinum", 2200, 2599),
+        ("crystal", 2600, 2999),
+        ("diamond", 3000, 3399),
+        ("master", 3400, float('inf')),
+    ]
+    for rank, low, high in ranks:
+        if low <= rating <= high:
+            return rank, low, high
+    return "master", 3400, 3400  # default to master если выше 3400
 
-        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 @bot.command()
 async def stat(ctx, member: discord.Member = None):
     try:
@@ -955,8 +995,11 @@ async def stat(ctx, member: discord.Member = None):
         player_id = resp_player["data"][0]["id"] if "data" in resp_player and resp_player["data"] else None
 
         average_damage = 0
+        duo_stats = {}
+        squad_stats = {}
+        
         if player_id:
-    # 2) Получаем список сезонов, чтобы найти текущий
+            # 2) Получаем список сезонов, чтобы найти текущий
             url_seasons = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/seasons"
             resp_seasons = requests.get(url_seasons, headers=headers).json()
             seasons = resp_seasons.get("data", [])
@@ -964,13 +1007,25 @@ async def stat(ctx, member: discord.Member = None):
             season_id = current["id"] if current else None
 
             if season_id:
-        # 3) Получаем статистику по текущему сезону
+                # 3) Получаем статистику по текущему сезону
                 url_stats = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players/{player_id}/seasons/{season_id}"
                 resp_stats = requests.get(url_stats, headers=headers).json()
-                squad_stats = resp_stats["data"]["attributes"]["gameModeStats"].get("squad-fpp", {})
+
+                game_modes = resp_stats["data"]["attributes"]["gameModeStats"]
+
+                # Берём squad-fpp для урона (как в твоём коде)
+                squad_stats = game_modes.get("squad-fpp", {})
                 rounds = squad_stats.get("roundsPlayed", 0)
                 if rounds > 0:
                     average_damage = squad_stats.get("damageDealt", 0) / rounds
+
+                # Получаем duo-fpp и squad-fpp для рейтинга (убийства и урон)
+                duo_stats = game_modes.get("duo-fpp", {})
+                squad_stats = game_modes.get("squad-fpp", {})
+
+                # Берём рейтинг из resp_stats["data"]["attributes"]["rankScore"] или подобное
+                # Пока пример с рандомным рейтингом для теста (замени на актуальное поле рейтинга)
+                rating = resp_stats["data"]["attributes"].get("rankScore", 0)
 
         # Получение данных из Supabase
         row = supabase.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
@@ -1037,6 +1092,104 @@ async def stat(ctx, member: discord.Member = None):
                 (x - thickness//2, y - thickness//2, x + thickness//2, y + thickness//2),
                 fill=(255, 255 - (i % 255), 0)
             )
+
+
+        rank_thresholds = [
+            ("bronze", 0, 1400),
+            ("silver", 1400, 1799),
+            ("gold", 1800, 2199),
+            ("platinum", 2200, 2599),
+            ("crystal", 2600, 2999),
+            ("diamond", 3000, 3399),
+            ("master", 3400, 10000),  # без ограничения сверху
+        ]
+
+        rank_name = "bronze"  # по умолчанию
+        low, high = 0, 1400
+        for rname, rlow, rhigh in rank_thresholds:
+            if rlow <= rating <= rhigh:
+                rank_name = rname
+                low, high = rlow, rhigh
+                break
+        else:
+            # Если выше максимума, считаем мастер
+            if rating > 3400:
+                rank_name = "master"
+                low, high = 3400, 3400
+
+        # --- Иконка ранга справа от аватара ---
+        rank_img_path = f"ranks/{rank_name}.png"  # Путь к твоим картинкам рангов
+        rank_img = Image.open(rank_img_path).convert("RGBA")
+        rank_img_size = 120
+        rank_img = rank_img.resize((rank_img_size, rank_img_size))
+
+        # Маска круга для иконки
+        mask_rank = Image.new("L", rank_img.size, 0)
+        mask_draw = ImageDraw.Draw(mask_rank)
+        mask_draw.ellipse((0, 0, rank_img_size, rank_img_size), fill=255)
+        rank_img.putalpha(mask_rank)
+
+        # Позиция иконки ранга — справа от аватара с отступом
+        rank_x = avatar_x + avatar_width + 30
+        rank_y = avatar_y + (avatar_height // 2) - (rank_img_size // 2)
+
+        img.paste(rank_img, (rank_x, rank_y), rank_img)
+
+        # --- Прогресс-бар рейтинга вокруг иконки ранга ---
+        radius_rank = rank_img_size // 2 + 10
+        thickness_rank = 8
+        center_rank = (rank_x + rank_img_size // 2, rank_y + rank_img_size // 2)
+
+        # Серое кольцо (фон прогресса)
+        draw.ellipse(
+            (center_rank[0] - radius_rank, center_rank[1] - radius_rank,
+             center_rank[0] + radius_rank, center_rank[1] + radius_rank),
+            outline=(80, 80, 80),
+            width=thickness_rank
+        )
+
+        # Вычисляем прогресс (0..1)
+        if rank_name == "master":
+            progress = 1.0
+        else:
+            progress = (rating - low) / max((high - low), 1)
+
+        start_angle = -90
+        end_angle = start_angle + int(360 * progress)
+
+        # Цветная дуга прогресса
+        draw.arc(
+            (center_rank[0] - radius_rank, center_rank[1] - radius_rank,
+             center_rank[0] + radius_rank, center_rank[1] + radius_rank),
+            start=start_angle,
+            end=end_angle,
+            fill=(255, 215, 0),
+            width=thickness_rank
+        )
+
+        # --- Статистика дуо и сквад слева от иконки ранга ---
+        stats_x = rank_x - 160  # Слева от иконки ранга
+        stats_y = rank_y + (rank_img_size // 2) - 20
+        line_height = 22
+
+        # Расчёт средних значений дуо
+        duo_kills = duo_stats.get("kills", 0)
+        duo_rounds = duo_stats.get("roundsPlayed", 1)
+        duo_avg_kills = duo_kills / max(duo_rounds, 1)
+        duo_damage = duo_stats.get("damageDealt", 0)
+        duo_avg_damage = duo_damage / max(duo_rounds, 1)
+
+        # Расчёт средних значений сквада
+        squad_kills = squad_stats.get("kills", 0)
+        squad_rounds = squad_stats.get("roundsPlayed", 1)
+        squad_avg_kills = squad_kills / max(squad_rounds, 1)
+        squad_damage = squad_stats.get("damageDealt", 0)
+        squad_avg_damage = squad_damage / max(squad_rounds, 1)
+
+        draw.text((stats_x, stats_y), f"Дуо: {duo_avg_kills:.2f} убийств, {duo_avg_damage:.1f} урон",
+                  font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((stats_x, stats_y + line_height), f"Сквад: {squad_avg_kills:.2f} убийств, {squad_avg_damage:.1f} урон",
+                  font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
         # Текст
         text_x = 230
