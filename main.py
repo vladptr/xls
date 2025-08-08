@@ -1064,7 +1064,7 @@ async def stat(ctx, member: discord.Member = None):
         avatar_bytes = await avatar_asset.read()
         avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA")
 
-        avatar_size = int(160 * 0.8)  # уменьшение на 20%
+        avatar_size = int(160 * 0.6)  # уменьшение на 20%
         avatar = avatar.resize((avatar_size, avatar_size))
         avatar = ImageOps.fit(avatar, avatar.size, centering=(0.5, 0.5))
 
@@ -1083,7 +1083,7 @@ async def stat(ctx, member: discord.Member = None):
         progress = exp_in_level / next_level_exp if next_level_exp > 0 else 1.0
 
         radius_level = avatar_size // 2 + 10
-        thickness_level = 8
+        thickness_level = 6
         center_level = (avatar_x + avatar_size // 2, avatar_y + avatar_size // 2)
 
         draw.ellipse(
@@ -1164,7 +1164,7 @@ async def stat(ctx, member: discord.Member = None):
 
 # Статистика рейтингового режима слева от иконки ранга (с отступом 40 пикселей)
         stats_right_x = rank_x - 300
-        stats_right_y = rank_y - 10
+        stats_right_y = rank_y - 5
 
         duo_ranked = ranked_stats.get("duo-fpp", {})
         squad_ranked = ranked_stats.get("squad-fpp", {})
