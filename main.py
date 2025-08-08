@@ -931,20 +931,7 @@ def get_total_exp_before(level):
         total += get_next_level_exp(l)
     return total
 
-async def check_pubg_api_key(key, platform="steam"):
-    headers = {
-        "Authorization": f"Bearer {key}",
-        "Accept": "application/vnd.api+json"
-    }
-    url = f"https://api.pubg.com/shards/{platform}/status"
-    try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            return True
-        else:
-            return False
-    except Exception:
-        return False
+
         
 @bot.command()
 async def stat(ctx, member: discord.Member = None):
@@ -952,9 +939,6 @@ async def stat(ctx, member: discord.Member = None):
         member = member or ctx.author
         user_id = member.id
 
-        if not await check_pubg_api_key(PUBG_API_KEY, PUBG_PLATFORM):
-            await ctx.send("❌ Ошибка: Неверный или недействительный PUBG API ключ.")
-            return
 
         # --- PUBG: поиск по первому слову ника ---
         pubg_name = member.display_name.split(" ")[0].strip()
