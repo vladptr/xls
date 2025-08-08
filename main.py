@@ -36,7 +36,7 @@ last_rename_times = {}
 
 PUBG_API_KEY = os.getenv("PUBG_API")
 PUBG_PLATFORM = "steam"
-
+print("PUBG API key:", repr(PUBG_API_KEY))
 
 users = {}
 weeks = []
