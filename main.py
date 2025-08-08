@@ -1123,15 +1123,20 @@ async def stat(ctx, member: discord.Member = None):
         rank_img_size = 120
         rank_img = rank_img.resize((rank_img_size, rank_img_size))
 
-# маска круга
         mask_rank = Image.new("L", rank_img.size, 0)
         mask_draw = ImageDraw.Draw(mask_rank)
         mask_draw.ellipse((0, 0, rank_img_size, rank_img_size), fill=255)
         rank_img.putalpha(mask_rank)
 
-        rank_x = avatar_x + avatar_width + 30
+# Позиция иконки — 20px от правого края
+        rank_x = width - 20 - rank_img_size
         rank_y = avatar_y + (avatar_height // 2) - (rank_img_size // 2)
+
         img.paste(rank_img, (rank_x, rank_y), rank_img)
+
+# Статистика слева от иконки
+        stats_x = rank_x - 160
+        stats_y = rank_y + (rank_img_size // 2) - 60 
 
 # прогресс бар
         radius_rank = rank_img_size // 2 + 10
@@ -1158,6 +1163,13 @@ async def stat(ctx, member: discord.Member = None):
             width=thickness_rank
         )
 
+        score_text = f"{rating}/{high}" if rank_name != "master" else f"{rating}+"
+        score_font = ImageFont.truetype(font_path, 18)
+        text_width, text_height = draw.textsize(score_text, font=score_font)
+        text_x = center_rank[0] - text_width // 2
+        text_y = rank_y + rank_img_size + 5
+        draw.text((text_x, text_y), score_text, font=score_font, fill="white", stroke_width=1, stroke_fill="black")
+        
 # статистика слева от иконки
         stats_x = rank_x - 160
         stats_y = rank_y + (rank_img_size // 2) - 60  # центрируем блок по вертикали
