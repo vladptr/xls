@@ -949,7 +949,7 @@ async def stat(ctx, member: discord.Member = None):
         resp_player = requests.get(url_player, headers=headers).json()
         player_id = resp_player["data"][0]["id"] if "data" in resp_player and resp_player["data"] else None
 
-       average_damage = 0
+        average_damage = 0
         if player_id:
     # 2) Получаем список сезонов, чтобы найти текущий
             url_seasons = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/seasons"
