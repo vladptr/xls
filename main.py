@@ -48,6 +48,8 @@ intents.voice_states = True
 intents.messages = True
 intents.message_content = True
 
+rating = 0
+
 service_account_info = json.loads(os.environ["GOOGLE_CREDS_JSON"])
 
 credentials = service_account.Credentials.from_service_account_info(
