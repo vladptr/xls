@@ -1070,7 +1070,7 @@ async def stat(ctx, member: discord.Member = None):
         avatar.putalpha(mask)
 
         avatar_x = 50
-        avatar_y = height // 2 - 80
+        avatar_y = height // 2 - (avatar.height // 2)
         img.paste(avatar, (avatar_x, avatar_y), avatar)
 
         # Круговая шкала опыта
@@ -1092,6 +1092,16 @@ async def stat(ctx, member: discord.Member = None):
                 (x - thickness//2, y - thickness//2, x + thickness//2, y + thickness//2),
                 fill=(255, 255 - (i % 255), 0)
             )
+
+         # Под аватаркой текст опыта
+        exp_text = f"{exp_on_this_level}/{next_level_exp}"
+        exp_font = ImageFont.truetype(font_path, 18)
+        bbox_exp = draw.textbbox((0, 0), exp_text, font=exp_font)
+        exp_width = bbox_exp[2] - bbox_exp[0]
+        exp_height = bbox_exp[3] - bbox_exp[1]
+        exp_x = avatar_x + (avatar_width // 2) - (exp_width // 2)
+        exp_y = avatar_y + avatar_height + 5
+        draw.text((exp_x, exp_y), exp_text, font=exp_font, fill="white", stroke_width=1, stroke_fill="black")
 
 
         rank_thresholds = [
@@ -1128,15 +1138,10 @@ async def stat(ctx, member: discord.Member = None):
         mask_draw.ellipse((0, 0, rank_img_size, rank_img_size), fill=255)
         rank_img.putalpha(mask_rank)
 
-# Позиция иконки — 20px от правого края
         rank_x = width - 20 - rank_img_size
         rank_y = avatar_y + (avatar_height // 2) - (rank_img_size // 2)
 
         img.paste(rank_img, (rank_x, rank_y), rank_img)
-
-# Статистика слева от иконки
-        stats_x = rank_x - 160
-        stats_y = rank_y + (rank_img_size // 2) - 60 
 
 # прогресс бар
         radius_rank = rank_img_size // 2 + 10
@@ -1173,8 +1178,9 @@ async def stat(ctx, member: discord.Member = None):
         draw.text((text_x, text_y), score_text, font=score_font, fill="white", stroke_width=1, stroke_fill="black")
         
 # статистика слева от иконки
-        stats_x = rank_x - 160
-        stats_y = rank_y + (rank_img_size // 2) - 60  # центрируем блок по вертикали
+        distance = rank_x - (avatar_x + avatar_width)
+        stats_x = avatar_x + avatar_width + int(distance * 0.3) - 160
+        stats_y = rank_y + (rank_img_size // 2) - 60
         line_height = 22
 
         duo_kills = duo_stats.get("kills", 0)
@@ -1202,15 +1208,16 @@ async def stat(ctx, member: discord.Member = None):
             y = stats_y + i * line_height
             draw.text((stats_x, y), line, font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
+        other_stats_y = stats_y - 3 * line_height
+        draw.text((stats_x, other_stats_y), f"Среднее: {avg_hours:.1f} ч.", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((stats_x, other_stats_y + line_height), f"Общее: {total_hours:.1f} ч.", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((stats_x, other_stats_y + line_height * 2), f"Уровень: {level}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+
         # Текст
         text_x = 230
         line_height = 24
 
         draw.text((text_x, avatar_y - 5), member.display_name, font=name_font, fill="white", stroke_width=1, stroke_fill="black")
-        draw.text((text_x, avatar_y + line_height), f"Среднее: {avg_hours:.1f} ч.", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
-        draw.text((text_x, avatar_y + line_height * 2), f"Общее: {total_hours:.1f} ч.", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
-        draw.text((text_x, avatar_y + line_height * 3), f"Уровень: {level}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
-        draw.text((text_x, avatar_y + line_height * 4), f"Опыт: {exp_on_this_level}/{next_level_exp}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
         # PUBG статистика
         draw.text((text_x, avatar_y + line_height * 5), f"PUBG Squad урон: {average_damage:.1f}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
