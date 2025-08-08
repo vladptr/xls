@@ -1065,6 +1065,11 @@ async def stat(ctx, member: discord.Member = None):
         center = (avatar_x + avatar_width // 2, avatar_y + avatar_height // 2)
         radius = avatar_width // 2 + 5
         thickness = 4
+
+        exp_for_current_level = get_total_exp_before(level)  # опыт, накопленный до начала текущего уровня
+        next_level_exp = get_next_level_exp(level)           # порог для следующего уровня
+        exp_on_this_level = exp - exp_for_current_level
+
         progress = min(max(exp_on_this_level / next_level_exp, 0), 1.0)
         start_angle = -90
         end_angle = start_angle + int(360 * progress)
