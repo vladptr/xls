@@ -37,6 +37,7 @@ last_rename_times = {}
 PUBG_API_KEY = os.getenv("PUBG_API")
 PUBG_PLATFORM = "steam"
 
+
 users = {}
 weeks = []
 subprocess.run(["chmod", "+x", "./ffmpeg"])
@@ -938,7 +939,8 @@ async def stat(ctx, member: discord.Member = None):
         user_id = member.id
 
         # --- PUBG: поиск по первому слову ника ---
-        pubg_name = member.display_name.split(" ")[0]
+        pubg_name = member.display_name.split(" ")[0].strip()
+        print(f"PUBG поиск ника: {pubg_name}")
         headers = {
             "Authorization": f"Bearer {PUBG_API_KEY}",
             "Accept": "application/vnd.api+json"
@@ -947,6 +949,7 @@ async def stat(ctx, member: discord.Member = None):
         # 1. Получаем ID игрока
         url_player = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players?filter[playerNames]={pubg_name}"
         resp_player = requests.get(url_player, headers=headers).json()
+        print(resp_player)
         player_id = resp_player["data"][0]["id"] if "data" in resp_player and resp_player["data"] else None
 
         average_damage = 0
