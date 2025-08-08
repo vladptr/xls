@@ -973,13 +973,13 @@ async def stat(ctx, member: discord.Member = None):
 
         # Выбор фона по уровню
         if level <= 5:
-            background_path = "1-5.jpg"
+            background_path = "1-5.png"
         elif level <= 10:
-            background_path = "5-10.jpg"
+            background_path = "5-10.png"
         elif level <= 25:
-            background_path = "10-25.jpg"
+            background_path = "10-25.png"
         else:
-            background_path = "25+.jpg"
+            background_path = "25+.png"
 
         img = Image.open(background_path).convert("RGBA")
         draw = ImageDraw.Draw(img)
