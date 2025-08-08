@@ -1198,43 +1198,6 @@ async def stat(ctx, member: discord.Member = None):
         draw.text((text_x, text_y), score_text, font=score_font, fill="white", stroke_width=1, stroke_fill="black")
 
    
-
-# -- Статистика справа от иконки ранга (рейтинговый режим) --
-        stats_right_x = rank_x - 160 - 40
-        stats_right_y = rank_y + (rank_img_size // 2) - 80
-
-# Рейтинговые данные duo-fpp и squad-fpp
-        duo_ranked = ranked_stats.get("duo-fpp", {})
-        squad_ranked = ranked_stats.get("squad-fpp", {})
-
-        duo_kills = duo_ranked.get("kills", 0)
-        duo_rounds = duo_ranked.get("roundsPlayed", 1)
-        duo_avg_kills = duo_kills / max(duo_rounds, 1)
-        duo_damage = duo_ranked.get("damageDealt", 0)
-        duo_avg_damage = duo_damage / max(duo_rounds, 1)
-
-        squad_kills = squad_ranked.get("kills", 0)
-        squad_rounds = squad_ranked.get("roundsPlayed", 1)
-        squad_avg_kills = squad_kills / max(squad_rounds, 1)
-        squad_damage = squad_ranked.get("damageDealt", 0)
-        squad_avg_damage = squad_damage / max(squad_rounds, 1)
-
-        stats_right_lines = [
-            "Рейтинговый режим:",
-            "Дуо FPP:",
-            f"  Убийств в среднем: {duo_avg_kills:.2f}",
-            f"  Средний урон: {duo_avg_damage:.1f}",
-            "Отряд FPP:",
-            f"  Убийств в среднем: {squad_avg_kills:.2f}",
-            f"  Средний урон: {squad_avg_damage:.1f}",
-        ]
-
-        for i, line in enumerate(stats_right_lines):
-            y = stats_right_y + i * line_height
-            draw.text((stats_right_x, y), line, font=small_font, fill="white", stroke_width=1, stroke_fill="black")
-        # PUBG статистика
-        draw.text((text_x, avatar_y + line_height * 5), f"PUBG Squad урон: {average_damage:.1f}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
-
         filename = f"stat_{user_id}.png"
         img.save(filename)
         stat_msg = await ctx.send(file=discord.File(filename))
