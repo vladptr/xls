@@ -1229,7 +1229,7 @@ async def stat(ctx, member: discord.Member = None):
         bbox = draw.textbbox((0, 0), score_text, font=score_font)
         text_width = bbox[2] - bbox[0]
         text_x = center_rank[0] - text_width // 2
-        text_y = rank_y + rank_img_size + 5
+        text_y = rank_y + rank_img_size - 5
         draw.text((text_x, text_y), score_text, font=score_font, fill="white", stroke_width=1, stroke_fill="black")
 
    
