@@ -1131,7 +1131,7 @@ async def stat(ctx, member: discord.Member = None):
 
 # Статистика рейтингового режима слева от иконки ранга (с отступом 40 пикселей)
         stats_right_x = rank_x - 300
-        stats_right_y = rank_y
+        stats_right_y = rank_y - 20
 
         duo_ranked = ranked_stats.get("duo-fpp", {})
         squad_ranked = ranked_stats.get("squad-fpp", {})
