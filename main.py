@@ -34,7 +34,7 @@ channel_locks = {}
 room_modes = {}
 last_rename_times = {}
 
-PUBG_API_KEY = os.getenv("PUBG_API")
+PUBG_API_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJjNjZhZjAzMC01NjZmLTAxM2UtNWVlNi03NmNhZDljYTc2ODYiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzU0NjQ4NjYyLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InhscyJ9.RNogGBm2XdHmPhvUNzgGJWs6bOVNubMW48xxwt6bnXo"
 PUBG_PLATFORM = "steam"
 print("PUBG API key:", repr(PUBG_API_KEY))
 
