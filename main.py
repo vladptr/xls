@@ -949,32 +949,6 @@ def get_rank_info(rating):
     return "master", 3400, 3400  # default to master если выше 3400
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 @bot.command()
 async def stat(ctx, member: discord.Member = None):
     try:
@@ -1075,7 +1049,7 @@ async def stat(ctx, member: discord.Member = None):
         avatar_y = height // 2 - (avatar.height // 2)
         img.paste(avatar, (avatar_x, avatar_y), avatar)
 
-        # Круговая шкала опыта вокруг аватара
+        # Круговая шкала опыта
         avatar_width, avatar_height = avatar.size
         center = (avatar_x + avatar_width // 2, avatar_y + avatar_height // 2)
         radius = avatar_width // 2 + 5
@@ -1091,11 +1065,11 @@ async def stat(ctx, member: discord.Member = None):
             x = center[0] + radius * math.cos(angle_rad)
             y = center[1] + radius * math.sin(angle_rad)
             draw.ellipse(
-                (x - thickness // 2, y - thickness // 2, x + thickness // 2, y + thickness // 2),
+                (x - thickness//2, y - thickness//2, x + thickness//2, y + thickness//2),
                 fill=(255, 255 - (i % 255), 0)
             )
 
-        # Под аватаркой текст опыта в формате "х/25"
+         # Под аватаркой текст опыта
         exp_text = f"{exp_on_this_level}/{next_level_exp}"
         exp_font = ImageFont.truetype(font_path, 18)
         bbox_exp = draw.textbbox((0, 0), exp_text, font=exp_font)
@@ -1105,7 +1079,7 @@ async def stat(ctx, member: discord.Member = None):
         exp_y = avatar_y + avatar_height + 5
         draw.text((exp_x, exp_y), exp_text, font=exp_font, fill="white", stroke_width=1, stroke_fill="black")
 
-        # Определение ранга по рейтингу
+
         rank_thresholds = [
             ("bronze", 0, 1400),
             ("silver", 1400, 1799),
@@ -1113,10 +1087,10 @@ async def stat(ctx, member: discord.Member = None):
             ("platinum", 2200, 2599),
             ("crystal", 2600, 2999),
             ("diamond", 3000, 3399),
-            ("master", 3400, 10000),
+            ("master", 3400, 10000),  # без ограничения сверху
         ]
 
-        rank_name = "bronze"
+        rank_name = "bronze"  # по умолчанию
         low, high = 0, 1400
         for rname, rlow, rhigh in rank_thresholds:
             if rlow <= rating <= rhigh:
@@ -1124,11 +1098,12 @@ async def stat(ctx, member: discord.Member = None):
                 low, high = rlow, rhigh
                 break
         else:
+            # Если выше максимума, считаем мастер
             if rating > 3400:
                 rank_name = "master"
                 low, high = 3400, 3400
 
-        # Иконка ранга справа
+        # --- Иконка ранга справа от аватара ---
         rank_img_path = f"ranks/{rank_name}.png"
         rank_img = Image.open(rank_img_path).convert("RGBA")
         rank_img_size = 120
@@ -1141,9 +1116,10 @@ async def stat(ctx, member: discord.Member = None):
 
         rank_x = width - 20 - rank_img_size
         rank_y = avatar_y + (avatar_height // 2) - (rank_img_size // 2)
+
         img.paste(rank_img, (rank_x, rank_y), rank_img)
 
-        # Прогресс-бары вокруг иконки рейтинга
+# прогресс бар
         radius_rank = rank_img_size // 2 + 10
         thickness_rank = 8
         center_rank = (rank_x + rank_img_size // 2, rank_y + rank_img_size // 2)
@@ -1168,7 +1144,6 @@ async def stat(ctx, member: discord.Member = None):
             width=thickness_rank
         )
 
-        # Текст с рейтингом под иконкой
         score_text = f"{rating}/{high}" if rank_name != "master" else f"{rating}+"
         score_font = ImageFont.truetype(font_path, 18)
         bbox = draw.textbbox((0, 0), score_text, font=score_font)
@@ -1177,45 +1152,51 @@ async def stat(ctx, member: discord.Member = None):
         text_x = center_rank[0] - text_width // 2
         text_y = rank_y + rank_img_size + 5
         draw.text((text_x, text_y), score_text, font=score_font, fill="white", stroke_width=1, stroke_fill="black")
-
-        # Статистика справа от аватара с отступом 40px
+        
+# статистика слева от иконки
         distance = rank_x - (avatar_x + avatar_width)
-        stat1_x = avatar_x + avatar_width + 40
-        stat1_y = avatar_y + avatar_height // 2 - 60
+        stats_x = avatar_x + avatar_width + int(distance * 0.3) - 160
+        stats_y = rank_y + (rank_img_size // 2) - 60
         line_height = 22
 
-        stat1_lines = [
-            "Статистика 1:",
-            f"Убийств (дуо): {duo_avg_kills:.2f}",
-            f"Урон (дуо): {duo_avg_damage:.1f}",
+        duo_kills = duo_stats.get("kills", 0)
+        duo_rounds = duo_stats.get("roundsPlayed", 1)
+        duo_avg_kills = duo_kills / max(duo_rounds, 1)
+        duo_damage = duo_stats.get("damageDealt", 0)
+        duo_avg_damage = duo_damage / max(duo_rounds, 1)
+
+        squad_kills = squad_stats.get("kills", 0)
+        squad_rounds = squad_stats.get("roundsPlayed", 1)
+        squad_avg_kills = squad_kills / max(squad_rounds, 1)
+        squad_damage = squad_stats.get("damageDealt", 0)
+        squad_avg_damage = squad_damage / max(squad_rounds, 1)
+
+        stats_lines = [
+            "Дуо:",
+            f"У/С: {duo_avg_kills:.2f}",
+            f"Средний урон: {duo_avg_damage:.1f}",
+            "Отряд:",
+            f"У/С: {squad_avg_kills:.2f}",
+            f"Средний урон: {squad_avg_damage:.1f}",
         ]
 
-        for i, line in enumerate(stat1_lines):
-            y = stat1_y + i * line_height
-            draw.text((stat1_x, y), line, font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        for i, line in enumerate(stats_lines):
+            y = stats_y + i * line_height
+            draw.text((stats_x, y), line, font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
-        # Статистика слева от иконки рейтинга с отступом 40px
-        stat2_x = rank_x - 160 - 40
-        stat2_y = rank_y + rank_img_size // 2 - 60
+        other_stats_y = stats_y - 3 * line_height
+        draw.text((stats_x, other_stats_y), f"Среднее: {avg_hours:.1f} ч.", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((stats_x, other_stats_y + line_height), f"Общее: {total_hours:.1f} ч.", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((stats_x, other_stats_y + line_height * 2), f"Уровень: {level}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
-        stat2_lines = [
-            "Статистика 2:",
-            f"Убийств (отряд): {squad_avg_kills:.2f}",
-            f"Урон (отряд): {squad_avg_damage:.1f}",
-            f"Среднее: {avg_hours:.1f} ч.",
-            f"Общее: {total_hours:.1f} ч.",
-            f"Уровень: {level}",
-        ]
+        # Текст
+        text_x = 230
+        line_height = 24
 
-        for i, line in enumerate(stat2_lines):
-            y = stat2_y + i * line_height
-            draw.text((stat2_x, y), line, font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((text_x, avatar_y - 5), member.display_name, font=name_font, fill="white", stroke_width=1, stroke_fill="black")
 
-        # Ник пользователя слева сверху рядом с аватаром
-        draw.text((avatar_x + avatar_width + 10, avatar_y - 10), member.display_name, font=name_font, fill="white", stroke_width=1, stroke_fill="black")
-
-        # PUBG статистика под ником (пример)
-        draw.text((avatar_x + avatar_width + 10, avatar_y + line_height * 5), f"PUBG Squad урон: {average_damage:.1f}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        # PUBG статистика
+        draw.text((text_x, avatar_y + line_height * 5), f"PUBG Squad урон: {average_damage:.1f}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
         filename = f"stat_{user_id}.png"
         img.save(filename)
