@@ -27,11 +27,15 @@ from webserver import keep_alive
 from datetime import datetime, UTC
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from io import BytesIO
+import requests
 
 setup_messages = {}
 channel_locks = {}
 room_modes = {}
 last_rename_times = {}
+
+PUBG_API_KEY = os.getenv("PUBG_API")
+PUBG_PLATFORM = "steam"
 
 users = {}
 weeks = []
@@ -933,6 +937,29 @@ async def stat(ctx, member: discord.Member = None):
         member = member or ctx.author
         user_id = member.id
 
+        # --- PUBG: поиск по первому слову ника ---
+        pubg_name = member.display_name.split(" ")[0]
+        headers = {
+            "Authorization": f"Bearer {PUBG_API_KEY}",
+            "Accept": "application/vnd.api+json"
+        }
+
+        # 1. Получаем ID игрока
+        url_player = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players?filter[playerNames]={pubg_name}"
+        resp_player = requests.get(url_player, headers=headers).json()
+
+        average_damage = 0
+        if "data" in resp_player and len(resp_player["data"]) > 0:
+            player_id = resp_player["data"][0]["id"]
+
+            # 2. Получаем статистику текущего сезона
+            url_stats = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players/{player_id}/seasons/lifetime"
+            resp_stats = requests.get(url_stats, headers=headers).json()
+
+            squad_stats = resp_stats["data"]["attributes"]["gameModeStats"].get("squad", {})
+            if squad_stats.get("roundsPlayed", 0) > 0:
+                average_damage = squad_stats["damageDealt"] / squad_stats["roundsPlayed"]
+
         # Получение данных из Supabase
         row = supabase.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
         stats = row.data[0] if row.data else {"exp": 0, "level": 1}
@@ -958,18 +985,17 @@ async def stat(ctx, member: discord.Member = None):
         draw = ImageDraw.Draw(img)
         width, height = img.size
 
-        # Настройка шрифтов
+        # Шрифты
         font_path = "FluffyFont.otf"
-        name_font = ImageFont.truetype(font_path, 28)
-        small_font = ImageFont.truetype(font_path, 18)
+        name_font = ImageFont.truetype(font_path, 24)
+        small_font = ImageFont.truetype(font_path, 16)
 
-        # Загружаем аватар пользователя
+        # Аватар
         avatar_asset = member.avatar or member.display_avatar
         avatar_bytes = await avatar_asset.read()
         avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA")
-
-        avatar_size = 160  # базовый размер
-        avatar = avatar.resize((int(avatar_size * 0.85), int(avatar_size * 0.85)))  # -15%
+        avatar_size = 160
+        avatar = avatar.resize((int(avatar_size * 0.85), int(avatar_size * 0.85)))
         avatar = ImageOps.fit(avatar, avatar.size, centering=(0.5, 0.5))
         mask = Image.new("L", avatar.size, 0)
         draw_mask = ImageDraw.Draw(mask)
@@ -980,19 +1006,17 @@ async def stat(ctx, member: discord.Member = None):
         avatar_y = height // 2 - 80
         img.paste(avatar, (avatar_x, avatar_y), avatar)
 
-        # Отрисовка круговой шкалы опыта вокруг аватарки
+        # Круговая шкала опыта
         avatar_width, avatar_height = avatar.size
         center = (avatar_x + avatar_width // 2, avatar_y + avatar_height // 2)
         radius = avatar_width // 2 + 5
         thickness = 4
         next_level_exp = get_next_level_exp(level)
         exp_on_this_level = exp - get_total_exp_before(level)
-        next_level_exp = get_next_level_exp(level)
         progress = min(max(exp_on_this_level / next_level_exp, 0), 1.0)
         start_angle = -90
         end_angle = start_angle + int(360 * progress)
 
-        # Градиентная шкала
         for i in range(start_angle, end_angle):
             angle_rad = math.radians(i)
             x = center[0] + radius * math.cos(angle_rad)
@@ -1002,42 +1026,39 @@ async def stat(ctx, member: discord.Member = None):
                 fill=(255, 255 - (i % 255), 0)
             )
 
-        # Имя пользователя
-        # Центр текстовой информации
+        # Текст
         text_x = 230
-        line_height = 28
+        line_height = 24
 
-# Имя пользователя
-        draw.text((text_x, avatar_y - 10), member.display_name, font=name_font, fill="white", stroke_width=1, stroke_fill="black")
-
-# Статистика
-        draw.text((text_x, avatar_y + line_height * 1), f"Среднее: {avg_hours:.1f} ч", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
-        draw.text((text_x, avatar_y + line_height * 2), f"Общее: {total_hours:.1f} ч", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((text_x, avatar_y - 5), member.display_name, font=name_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((text_x, avatar_y + line_height), f"Среднее: {avg_hours:.1f} ч.", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((text_x, avatar_y + line_height * 2), f"Общее: {total_hours:.1f} ч.", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
         draw.text((text_x, avatar_y + line_height * 3), f"Уровень: {level}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
-        draw.text((text_x, avatar_y + line_height * 4), f"Опыт: {exp_on_this_level} / {next_level_exp}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        draw.text((text_x, avatar_y + line_height * 4), f"Опыт: {exp_on_this_level}/{next_level_exp}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
+        # PUBG статистика
+        draw.text((text_x, avatar_y + line_height * 5), f"PUBG Squad урон: {average_damage:.1f}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
         filename = f"stat_{user_id}.png"
         img.save(filename)
         stat_msg = await ctx.send(file=discord.File(filename))
 
-        # Удаление через 3 минуты
+        # Удаление
         async def delete_later():
             await asyncio.sleep(120)
             try:
                 await stat_msg.delete()
             except discord.NotFound:
-                pass  # сообщение уже удалено вручную
-            except Exception as e:
-                print(f"❌ Ошибка при удалении сообщения: {e}")
+                pass
             try:
                 os.remove(filename)
             except FileNotFoundError:
                 pass
-            except Exception as e:
-                print(f"❌ Ошибка при удалении файла: {e}")
 
         bot.loop.create_task(delete_later())
+
+    except Exception as e:
+        await ctx.send(f"❌ Ошибка в команде stat: {e}")
 
 
 @bot.command()
