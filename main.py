@@ -1002,7 +1002,28 @@ async def stat(ctx, member: discord.Member = None):
                 # Берём рейтинг из resp_stats["data"]["attributes"]["rankScore"] или подобное
                 # Пока пример с рандомным рейтингом для теста (замени на актуальное поле рейтинга)
                 rating = resp_stats["data"]["attributes"].get("rankScore", 0)
+        rank_thresholds = [
+            ("bronze", 0, 1400),
+            ("silver", 1400, 1799),
+            ("gold", 1800, 2199),
+            ("platinum", 2200, 2599),
+            ("crystal", 2600, 2999),
+            ("diamond", 3000, 3399),
+            ("master", 3400, 10000),  # без ограничения сверху
+        ]
 
+        rank_name = "bronze"  # по умолчанию
+        low, high = 0, 1400
+        for rname, rlow, rhigh in rank_thresholds:
+            if rlow <= rating <= rhigh:
+                rank_name = rname
+                low, high = rlow, rhigh
+                break
+        else:
+            if rating > 3400:
+                rank_name = "master"
+                low, high = 3400, 3400
+                
         # Получение данных из Supabase
         row = supabase.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
         stats = row.data[0] if row.data else {"exp": 0, "level": 1}
