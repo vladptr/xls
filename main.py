@@ -1038,7 +1038,7 @@ async def stat(ctx, member: discord.Member = None):
         avatar_bytes = await avatar_asset.read()
         avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA")
 
-        avatar_size = int(160 * 0.93)  # 149px примерно
+        avatar_size = int(160 * 0.93)  # уменьшение на 7%
         avatar = avatar.resize((avatar_size, avatar_size))
         avatar = ImageOps.fit(avatar, avatar.size, centering=(0.5, 0.5))
 
@@ -1051,7 +1051,7 @@ async def stat(ctx, member: discord.Member = None):
         avatar_y = height // 2 - (avatar_size // 2)
         img.paste(avatar, (avatar_x, avatar_y), avatar)
 
-# Ник пользователя сверху слева от аватара (примерно 30px выше аватара)
+# Ник сверху слева от аватара
         draw.text(
             (avatar_x, avatar_y - 30),
             member.display_name,
@@ -1066,8 +1066,6 @@ async def stat(ctx, member: discord.Member = None):
         center = (avatar_x + avatar_width // 2, avatar_y + avatar_height // 2)
         radius = avatar_width // 2 + 5
         thickness = 4
-        next_level_exp = get_next_level_exp(level)
-        exp_on_this_level = exp - get_total_exp_before(level)
         progress = min(max(exp_on_this_level / next_level_exp, 0), 1.0)
         start_angle = -90
         end_angle = start_angle + int(360 * progress)
@@ -1086,12 +1084,11 @@ async def stat(ctx, member: discord.Member = None):
         exp_font = ImageFont.truetype(font_path, 18)
         bbox_exp = draw.textbbox((0, 0), exp_text, font=exp_font)
         exp_width = bbox_exp[2] - bbox_exp[0]
-        exp_height = bbox_exp[3] - bbox_exp[1]
         exp_x = avatar_x + (avatar_width // 2) - (exp_width // 2)
         exp_y = avatar_y + avatar_height + 5
         draw.text((exp_x, exp_y), exp_text, font=exp_font, fill="white", stroke_width=1, stroke_fill="black")
 
-# Определяем иконку ранга
+# -- Иконка ранга --
         rank_thresholds = [
             ("bronze", 0, 1400),
             ("silver", 1400, 1799),
@@ -1102,7 +1099,7 @@ async def stat(ctx, member: discord.Member = None):
             ("master", 3400, 10000),
         ]
 
-        rank_name = "bronze"  # по умолчанию
+        rank_name = "bronze"
         low, high = 0, 1400
         for rname, rlow, rhigh in rank_thresholds:
             if rlow <= rating <= rhigh:
@@ -1114,7 +1111,6 @@ async def stat(ctx, member: discord.Member = None):
                 rank_name = "master"
                 low, high = 3400, 3400
 
-# Иконка рейтинга справа, 20px от правого края
         rank_img_path = f"ranks/{rank_name}.png"
         rank_img = Image.open(rank_img_path).convert("RGBA")
         rank_img_size = 120
@@ -1129,7 +1125,7 @@ async def stat(ctx, member: discord.Member = None):
         rank_y = height // 2 - (rank_img_size // 2)
         img.paste(rank_img, (rank_x, rank_y), rank_img)
 
-# Прогресс бар вокруг иконки рейтинга
+# Прогресс бар вокруг ранга
         radius_rank = rank_img_size // 2 + 10
         thickness_rank = 8
         center_rank = (rank_x + rank_img_size // 2, rank_y + rank_img_size // 2)
@@ -1162,53 +1158,60 @@ async def stat(ctx, member: discord.Member = None):
         text_y = rank_y + rank_img_size + 5
         draw.text((text_x, text_y), score_text, font=score_font, fill="white", stroke_width=1, stroke_fill="black")
 
-# Вычисляем отступ между аватаром и иконкой рейтинга
-        distance = rank_x - (avatar_x + avatar_width)
-
-# Статистика справа от аватара (отступ ~40 пикселей)
+    # -- Статистика слева от аватара (базовая) --
         stats_left_x = avatar_x + avatar_width + 40
-        stats_left_y = avatar_y + (avatar_height // 2) - 60
+        stats_left_y = avatar_y + (avatar_height // 2) - 80
         line_height = 22
 
+# Средний урон в отряде FPP (обычный режим)
+        normal_squad_damage = squad_stats.get("damageDealt", 0)
+        normal_squad_rounds = squad_stats.get("roundsPlayed", 1)
+        normal_squad_avg_damage = normal_squad_damage / max(normal_squad_rounds, 1)
+
         stats_left_lines = [
-            f"Среднее: {avg_hours:.1f} ч.",
-            f"Общее: {total_hours:.1f} ч.",
+            f"Среднее время: {avg_hours:.1f} ч.",
+            f"Общее время: {total_hours:.1f} ч.",
             f"Уровень: {level}",
+            f"Средний урон в отряде FPP: {normal_squad_avg_damage:.1f}",
         ]
 
         for i, line in enumerate(stats_left_lines):
             y = stats_left_y + i * line_height
             draw.text((stats_left_x, y), line, font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
-# Статистика слева от иконки рейтинга (с отступом ~40 пикселей от иконки)
+# -- Статистика справа от иконки ранга (рейтинговый режим) --
         stats_right_x = rank_x - 160 - 40
-        stats_right_y = rank_y + (rank_img_size // 2) - 60
+        stats_right_y = rank_y + (rank_img_size // 2) - 80
 
-        duo_kills = duo_stats.get("kills", 0)
-        duo_rounds = duo_stats.get("roundsPlayed", 1)
+# Рейтинговые данные duo-fpp и squad-fpp
+        duo_ranked = ranked_stats.get("duo-fpp", {})
+        squad_ranked = ranked_stats.get("squad-fpp", {})
+
+        duo_kills = duo_ranked.get("kills", 0)
+        duo_rounds = duo_ranked.get("roundsPlayed", 1)
         duo_avg_kills = duo_kills / max(duo_rounds, 1)
-        duo_damage = duo_stats.get("damageDealt", 0)
+        duo_damage = duo_ranked.get("damageDealt", 0)
         duo_avg_damage = duo_damage / max(duo_rounds, 1)
 
-        squad_kills = squad_stats.get("kills", 0)
-        squad_rounds = squad_stats.get("roundsPlayed", 1)
+        squad_kills = squad_ranked.get("kills", 0)
+        squad_rounds = squad_ranked.get("roundsPlayed", 1)
         squad_avg_kills = squad_kills / max(squad_rounds, 1)
-        squad_damage = squad_stats.get("damageDealt", 0)
+        squad_damage = squad_ranked.get("damageDealt", 0)
         squad_avg_damage = squad_damage / max(squad_rounds, 1)
 
         stats_right_lines = [
-            "Дуо:",
-            f"У/С: {duo_avg_kills:.2f}",
-            f"Средний урон: {duo_avg_damage:.1f}",
-            "Отряд:",
-            f"У/С: {squad_avg_kills:.2f}",
-            f"Средний урон: {squad_avg_damage:.1f}",
+            "Рейтинговый режим:",
+            "Дуо FPP:",
+            f"  Убийств в среднем: {duo_avg_kills:.2f}",
+            f"  Средний урон: {duo_avg_damage:.1f}",
+            "Отряд FPP:",
+            f"  Убийств в среднем: {squad_avg_kills:.2f}",
+            f"  Средний урон: {squad_avg_damage:.1f}",
         ]
 
         for i, line in enumerate(stats_right_lines):
             y = stats_right_y + i * line_height
             draw.text((stats_right_x, y), line, font=small_font, fill="white", stroke_width=1, stroke_fill="black")
-
         # PUBG статистика
         draw.text((text_x, avatar_y + line_height * 5), f"PUBG Squad урон: {average_damage:.1f}", font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
