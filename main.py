@@ -1165,7 +1165,9 @@ async def stat(ctx, member: discord.Member = None):
 
         score_text = f"{rating}/{high}" if rank_name != "master" else f"{rating}+"
         score_font = ImageFont.truetype(font_path, 18)
-        text_width, text_height = draw.textsize(score_text, font=score_font)
+        bbox = draw.textbbox((0, 0), score_text, font=score_font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
         text_x = center_rank[0] - text_width // 2
         text_y = rank_y + rank_img_size + 5
         draw.text((text_x, text_y), score_text, font=score_font, fill="white", stroke_width=1, stroke_fill="black")
