@@ -983,7 +983,7 @@ async def stat(ctx, member: discord.Member = None):
         # 3) Получаем статистику по текущему сезону
                 url_stats = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players/{player_id}/seasons/{season_id}"
                 resp_stats = requests.get(url_stats, headers=headers).json()
-                squad_stats = resp_stats["data"]["attributes"]["gameModeStats"].get("squad", {})
+                squad_stats = resp_stats["data"]["attributes"]["gameModeStats"].get("squad-fpp", {})
                 rounds = squad_stats.get("roundsPlayed", 0)
                 if rounds > 0:
                     average_damage = squad_stats.get("damageDealt", 0) / rounds
