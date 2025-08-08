@@ -1118,29 +1118,26 @@ async def stat(ctx, member: discord.Member = None):
                 low, high = 3400, 3400
 
         # --- Иконка ранга справа от аватара ---
-        rank_img_path = f"ranks/{rank_name}.png"  # Путь к твоим картинкам рангов
+        rank_img_path = f"ranks/{rank_name}.png"
         rank_img = Image.open(rank_img_path).convert("RGBA")
         rank_img_size = 120
         rank_img = rank_img.resize((rank_img_size, rank_img_size))
 
-        # Маска круга для иконки
+# маска круга
         mask_rank = Image.new("L", rank_img.size, 0)
         mask_draw = ImageDraw.Draw(mask_rank)
         mask_draw.ellipse((0, 0, rank_img_size, rank_img_size), fill=255)
         rank_img.putalpha(mask_rank)
 
-        # Позиция иконки ранга — справа от аватара с отступом
         rank_x = avatar_x + avatar_width + 30
         rank_y = avatar_y + (avatar_height // 2) - (rank_img_size // 2)
-
         img.paste(rank_img, (rank_x, rank_y), rank_img)
 
-        # --- Прогресс-бар рейтинга вокруг иконки ранга ---
+# прогресс бар
         radius_rank = rank_img_size // 2 + 10
         thickness_rank = 8
         center_rank = (rank_x + rank_img_size // 2, rank_y + rank_img_size // 2)
 
-        # Серое кольцо (фон прогресса)
         draw.ellipse(
             (center_rank[0] - radius_rank, center_rank[1] - radius_rank,
              center_rank[0] + radius_rank, center_rank[1] + radius_rank),
@@ -1148,16 +1145,10 @@ async def stat(ctx, member: discord.Member = None):
             width=thickness_rank
         )
 
-        # Вычисляем прогресс (0..1)
-        if rank_name == "master":
-            progress = 1.0
-        else:
-            progress = (rating - low) / max((high - low), 1)
-
+        progress = 1.0 if rank_name == "master" else max(0.0, min((rating - low) / (high - low), 1.0))
         start_angle = -90
         end_angle = start_angle + int(360 * progress)
 
-        # Цветная дуга прогресса
         draw.arc(
             (center_rank[0] - radius_rank, center_rank[1] - radius_rank,
              center_rank[0] + radius_rank, center_rank[1] + radius_rank),
@@ -1167,29 +1158,35 @@ async def stat(ctx, member: discord.Member = None):
             width=thickness_rank
         )
 
-        # --- Статистика дуо и сквад слева от иконки ранга ---
-        stats_x = rank_x - 160  # Слева от иконки ранга
-        stats_y = rank_y + (rank_img_size // 2) - 20
+# статистика слева от иконки
+        stats_x = rank_x - 160
+        stats_y = rank_y + (rank_img_size // 2) - 60  # центрируем блок по вертикали
         line_height = 22
 
-        # Расчёт средних значений дуо
         duo_kills = duo_stats.get("kills", 0)
         duo_rounds = duo_stats.get("roundsPlayed", 1)
         duo_avg_kills = duo_kills / max(duo_rounds, 1)
         duo_damage = duo_stats.get("damageDealt", 0)
         duo_avg_damage = duo_damage / max(duo_rounds, 1)
 
-        # Расчёт средних значений сквада
         squad_kills = squad_stats.get("kills", 0)
         squad_rounds = squad_stats.get("roundsPlayed", 1)
         squad_avg_kills = squad_kills / max(squad_rounds, 1)
         squad_damage = squad_stats.get("damageDealt", 0)
         squad_avg_damage = squad_damage / max(squad_rounds, 1)
 
-        draw.text((stats_x, stats_y), f"Дуо: {duo_avg_kills:.2f} убийств, {duo_avg_damage:.1f} урон",
-                  font=small_font, fill="white", stroke_width=1, stroke_fill="black")
-        draw.text((stats_x, stats_y + line_height), f"Сквад: {squad_avg_kills:.2f} убийств, {squad_avg_damage:.1f} урон",
-                  font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+        stats_lines = [
+            "Дуо:",
+            f"У/С: {duo_avg_kills:.2f}",
+            f"Средний урон: {duo_avg_damage:.1f}",
+            "Отряд:",
+            f"У/С: {squad_avg_kills:.2f}",
+            f"Средний урон: {squad_avg_damage:.1f}",
+        ]
+
+        for i, line in enumerate(stats_lines):
+            y = stats_y + i * line_height
+            draw.text((stats_x, y), line, font=small_font, fill="white", stroke_width=1, stroke_fill="black")
 
         # Текст
         text_x = 230
