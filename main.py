@@ -1197,26 +1197,7 @@ async def stat(ctx, member: discord.Member = None):
         text_y = rank_y + rank_img_size + 5
         draw.text((text_x, text_y), score_text, font=score_font, fill="white", stroke_width=1, stroke_fill="black")
 
-    # -- Статистика слева от аватара (базовая) --
-        stats_left_x = avatar_x + avatar_width + 40
-        stats_left_y = avatar_y + (avatar_height // 2) - 80
-        line_height = 22
-
-# Средний урон в отряде FPP (обычный режим)
-        normal_squad_damage = squad_stats.get("damageDealt", 0)
-        normal_squad_rounds = squad_stats.get("roundsPlayed", 1)
-        normal_squad_avg_damage = normal_squad_damage / max(normal_squad_rounds, 1)
-
-        stats_left_lines = [
-            f"Среднее время: {avg_hours:.1f} ч.",
-            f"Общее время: {total_hours:.1f} ч.",
-            f"Уровень: {level}",
-            f"Средний урон в отряде FPP: {normal_squad_avg_damage:.1f}",
-        ]
-
-        for i, line in enumerate(stats_left_lines):
-            y = stats_left_y + i * line_height
-            draw.text((stats_left_x, y), line, font=small_font, fill="white", stroke_width=1, stroke_fill="black")
+   
 
 # -- Статистика справа от иконки ранга (рейтинговый режим) --
         stats_right_x = rank_x - 160 - 40
