@@ -1079,7 +1079,40 @@ async def stat(ctx, member: discord.Member = None):
         avatar_y = height // 2 - (avatar_size // 2)
         img.paste(avatar, (avatar_x, avatar_y), avatar)
 
-# Ник пользователя по центру (можно поправить позиционирование, если нужно)
+        level, exp_in_level, next_level_exp = calculate_level_from_exp(exp)
+        progress = exp_in_level / next_level_exp if next_level_exp > 0 else 1.0
+
+        radius_level = avatar_size // 2 + 10
+        thickness_level = 8
+        center_level = (avatar_x + avatar_size // 2, avatar_y + avatar_size // 2)
+
+        draw.ellipse(
+            (center_level[0] - radius_level, center_level[1] - radius_level,
+             center_level[0] + radius_level, center_level[1] + radius_level),
+            outline=(80, 80, 80),
+            width=thickness_level
+        )
+
+        start_angle = -90
+        end_angle = start_angle + int(360 * progress)
+
+        draw.arc(
+            (center_level[0] - radius_level, center_level[1] - radius_level,
+             center_level[0] + radius_level, center_level[1] + radius_level),
+            start=start_angle,
+            end=end_angle,
+            fill=(0, 191, 255),  # цвет прогресса уровня (голубой)
+            width=thickness_level
+        )
+        
+        level_text = f"Уровень {level} ({exp_in_level}/{next_level_exp})"
+        level_font = ImageFont.truetype(font_path, 16)
+        bbox = draw.textbbox((0, 0), level_text, font=level_font)
+        text_width = bbox[2] - bbox[0]
+        text_x = center_level[0] - text_width // 2
+        text_y = avatar_y + avatar_size + 10
+        draw.text((text_x, text_y), level_text, font=level_font, fill="white", stroke_width=1, stroke_fill="black")
+        # Ник пользователя по центру (можно поправить позиционирование, если нужно)
         center_x = width // 2
         center_y = height // 2
         name_bbox = draw.textbbox((0, 0), member.display_name, font=name_font)
@@ -1131,7 +1164,7 @@ async def stat(ctx, member: discord.Member = None):
 
 # Статистика рейтингового режима слева от иконки ранга (с отступом 40 пикселей)
         stats_right_x = rank_x - 300
-        stats_right_y = rank_y - 20
+        stats_right_y = rank_y - 10
 
         duo_ranked = ranked_stats.get("duo-fpp", {})
         squad_ranked = ranked_stats.get("squad-fpp", {})
