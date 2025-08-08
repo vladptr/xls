@@ -947,18 +947,25 @@ async def stat(ctx, member: discord.Member = None):
         # 1. Получаем ID игрока
         url_player = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players?filter[playerNames]={pubg_name}"
         resp_player = requests.get(url_player, headers=headers).json()
+        player_id = resp_player["data"][0]["id"] if "data" in resp_player and resp_player["data"] else None
 
-        average_damage = 0
-        if "data" in resp_player and len(resp_player["data"]) > 0:
-            player_id = resp_player["data"][0]["id"]
+       average_damage = 0
+        if player_id:
+    # 2) Получаем список сезонов, чтобы найти текущий
+            url_seasons = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/seasons"
+            resp_seasons = requests.get(url_seasons, headers=headers).json()
+            seasons = resp_seasons.get("data", [])
+            current = next((s for s in seasons if s["attributes"].get("isCurrentSeason")), None)
+            season_id = current["id"] if current else None
 
-            # 2. Получаем статистику текущего сезона
-            url_stats = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players/{player_id}/seasons/lifetime"
-            resp_stats = requests.get(url_stats, headers=headers).json()
-
-            squad_stats = resp_stats["data"]["attributes"]["gameModeStats"].get("squad", {})
-            if squad_stats.get("roundsPlayed", 0) > 0:
-                average_damage = squad_stats["damageDealt"] / squad_stats["roundsPlayed"]
+            if season_id:
+        # 3) Получаем статистику по текущему сезону
+                url_stats = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players/{player_id}/seasons/{season_id}"
+                resp_stats = requests.get(url_stats, headers=headers).json()
+                squad_stats = resp_stats["data"]["attributes"]["gameModeStats"].get("squad", {})
+                rounds = squad_stats.get("roundsPlayed", 0)
+                if rounds > 0:
+                    average_damage = squad_stats.get("damageDealt", 0) / rounds
 
         # Получение данных из Supabase
         row = supabase.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
