@@ -987,6 +987,7 @@ async def stat(ctx, member: discord.Member = None):
                 resp_stats = requests.get(url_stats, headers=headers).json()
 
                 game_modes = resp_stats["data"]["attributes"]["gameModeStats"]
+                ranked_stats = game_modes.get("squad-fpp-ranked", {})
 
                 # Берём squad-fpp для урона (как в твоём коде)
                 squad_stats = game_modes.get("squad-fpp", {})
