@@ -916,8 +916,7 @@ def get_next_level_exp(level: int) -> int:
     else:
         return 1875 + 150 * (level - 25)
 
-def get_next_level_exp(level):
-    return 50 + (level - 1) * 25
+
 
 def calculate_level_from_exp(exp):
     level = 1
