@@ -1105,7 +1105,7 @@ async def stat(ctx, member: discord.Member = None):
             width=thickness_level
         )
         
-        level_text = f"Уровень {level} ({exp_in_level}/{next_level_exp})"
+        level_text = f"({exp_in_level}/{next_level_exp})"
         level_font = ImageFont.truetype(font_path, 16)
         bbox = draw.textbbox((0, 0), level_text, font=level_font)
         text_width = bbox[2] - bbox[0]
@@ -1150,7 +1150,9 @@ async def stat(ctx, member: discord.Member = None):
 # --- Иконка ранга справа ---
         rank_img_path = f"ranks/{rank_name}.png"
         rank_img = Image.open(rank_img_path).convert("RGBA")
-        rank_img_size = 120
+        original_size = 120
+        scale = 1  # 80%
+        rank_img_size = int(original_size * scale)
         rank_img = rank_img.resize((rank_img_size, rank_img_size))
 
         mask_rank = Image.new("L", (rank_img_size, rank_img_size), 0)
@@ -1198,8 +1200,8 @@ async def stat(ctx, member: discord.Member = None):
 
 
 # Прогресс бар вокруг ранга
-        radius_rank = rank_img_size // 2 + 10
-        thickness_rank = 8
+        radius_rank = int((rank_img_size // 2 + 10)*0.8)
+        thickness_rank = 6
         center_rank = (rank_x + rank_img_size // 2, rank_y + rank_img_size // 2)
 
         draw.ellipse(
