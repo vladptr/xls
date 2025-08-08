@@ -974,34 +974,39 @@ async def stat(ctx, member: discord.Member = None):
         squad_stats = {}
         
         if player_id:
-            # 2) Получаем список сезонов, чтобы найти текущий
+    # 2) Получаем список сезонов, чтобы найти текущий
             url_seasons = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/seasons"
             resp_seasons = requests.get(url_seasons, headers=headers).json()
             seasons = resp_seasons.get("data", [])
             current = next((s for s in seasons if s["attributes"].get("isCurrentSeason")), None)
             season_id = current["id"] if current else None
-
+            if not player_id:
+                ranked_stats = {}
+                squad_stats = {}
+                duo_stats = {}
+                rank_name = "bronze"
+                rating = 0
             if season_id:
-                # 3) Получаем статистику по текущему сезону
+        # 3) Получаем статистику по текущему сезону
                 url_stats = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players/{player_id}/seasons/{season_id}"
                 resp_stats = requests.get(url_stats, headers=headers).json()
 
                 game_modes = resp_stats["data"]["attributes"]["gameModeStats"]
                 ranked_stats = game_modes.get("squad-fpp-ranked", {})
 
-                # Берём squad-fpp для урона (как в твоём коде)
+        # Берём squad-fpp для урона (как в твоём коде)
                 squad_stats = game_modes.get("squad-fpp", {})
                 rounds = squad_stats.get("roundsPlayed", 0)
                 if rounds > 0:
                     average_damage = squad_stats.get("damageDealt", 0) / rounds
 
-                # Получаем duo-fpp и squad-fpp для рейтинга (убийства и урон)
+        # Получаем duo-fpp и squad-fpp для рейтинга (убийства и урон)
                 duo_stats = game_modes.get("duo-fpp", {})
                 squad_stats = game_modes.get("squad-fpp", {})
-
                 # Берём рейтинг из resp_stats["data"]["attributes"]["rankScore"] или подобное
                 # Пока пример с рандомным рейтингом для теста (замени на актуальное поле рейтинга)
                 rating = resp_stats["data"]["attributes"].get("rankScore", 0)
+        
         rank_thresholds = [
             ("bronze", 0, 1400),
             ("silver", 1400, 1799),
@@ -1009,7 +1014,7 @@ async def stat(ctx, member: discord.Member = None):
             ("platinum", 2200, 2599),
             ("crystal", 2600, 2999),
             ("diamond", 3000, 3399),
-            ("master", 3400, 10000),  # без ограничения сверху
+            ("master", 3400, 10000),
         ]
 
         rank_name = "bronze"  # по умолчанию
