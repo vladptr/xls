@@ -1068,6 +1068,8 @@ async def stat(ctx, member: discord.Member = None):
         avatar = avatar.resize((avatar_size, avatar_size))
         avatar = ImageOps.fit(avatar, avatar.size, centering=(0.5, 0.5))
 
+        avatar_width, avatar_height = avatar.size
+        
         mask = Image.new("L", avatar.size, 0)
         draw_mask = ImageDraw.Draw(mask)
         draw_mask.ellipse((0, 0, avatar.size[0], avatar.size[1]), fill=255)
