@@ -991,7 +991,9 @@ async def stat(ctx, member: discord.Member = None):
 
         ranked_stats = resp_ranked.get("data", {}).get("attributes", {}).get("rankedGameModeStats", {})
         squad_ranked = ranked_stats.get("squad-fpp", {})
-
+        normal_stats = resp_ranked.get("data", {}).get("attributes", {}).get("gameModeStats", {})
+        squad_stats = normal_stats.get("squad-fpp", {})
+        
         current_rank_point = squad_ranked.get("currentRankPoint", 0)
         rounds_played = squad_ranked.get("roundsPlayed", 0)
         damage_dealt = squad_ranked.get("damageDealt", 0)
