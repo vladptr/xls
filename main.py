@@ -1211,6 +1211,12 @@ async def stat(ctx, member: discord.Member = None):
         radius_rank = int((rank_img_size // 2 + 10)*0.8)
         thickness_rank = 6
         center_rank = (rank_x + rank_img_size // 2, rank_y + rank_img_size // 2)
+
+        max_angle = 399  # фиксированная длина шкалы в градусах
+        start_angle = -90
+        progress = (current_rank_point - low) / (high - low) if high > low else 1.0
+        progress = max(0.0, min(progress, 1.0))  # ограничиваем от 0 до 1
+        end_angle = start_angle + int(max_angle * progress)
         
         draw.ellipse(
             (center_rank[0] - radius_rank, center_rank[1] - radius_rank,
@@ -1218,7 +1224,8 @@ async def stat(ctx, member: discord.Member = None):
             outline=(80, 80, 80),
             width=thickness_rank
         )
-
+        
+        
         draw.arc(
             (center_rank[0] - radius_rank, center_rank[1] - radius_rank,
              center_rank[0] + radius_rank, center_rank[1] + radius_rank),
