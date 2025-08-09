@@ -957,15 +957,38 @@ async def stat(ctx, member: discord.Member = None):
         member = member or ctx.author
         user_id = member.id
 
-
-        # --- PUBG: поиск по первому слову ника ---
+# Получаем ник для поиска
         pubg_name = member.display_name.split(" ")[0].strip()
         print(f"PUBG поиск ника: {pubg_name}")
+
         headers = {
             "Authorization": f"Bearer {PUBG_API_KEY}",
             "Accept": "application/vnd.api+json"
         }
-        #поиск по айди
+
+# Сначала получаем player_id по имени
+        url_player = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players?filter[playerNames]={pubg_name}"
+        resp_player = requests.get(url_player, headers=headers).json()
+
+        player_id = None
+        if "data" in resp_player and resp_player["data"]:
+            player_id = resp_player["data"][0]["id"]
+        else:
+            await ctx.send(f"Игрок с ником {pubg_name} не найден.")
+            return
+
+# Получаем текущий сезон
+        url_seasons = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/seasons"
+        resp_seasons = requests.get(url_seasons, headers=headers).json()
+        seasons = resp_seasons.get("data", [])
+        current = next((s for s in seasons if s["attributes"].get("isCurrentSeason")), None)
+        season_id = current["id"] if current else None
+
+        if not season_id:
+            await ctx.send("Не удалось получить текущий сезон PUBG.")
+            return
+
+# Получаем рейтинговую статистику
         url_ranked_stats = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players/{player_id}/seasons/{season_id}/ranked"
         resp_ranked = requests.get(url_ranked_stats, headers=headers).json()
 
@@ -973,36 +996,13 @@ async def stat(ctx, member: discord.Member = None):
         squad_ranked = ranked_stats.get("squad-fpp", {})
 
         current_rank_point = squad_ranked.get("currentRankPoint", 0)
-        
-        
+        rounds_played = squad_ranked.get("roundsPlayed", 0)
+        damage_dealt = squad_ranked.get("damageDealt", 0)
+        kda = squad_ranked.get("kda", 0)
 
-        average_damage = 0
-        duo_stats = {}
-        squad_stats = {}
+        average_damage = damage_dealt / max(rounds_played, 1)
 
-        if player_id:
-            url_seasons = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/seasons"
-            resp_seasons = requests.get(url_seasons, headers=headers).json()
-            seasons = resp_seasons.get("data", [])
-            current = next((s for s in seasons if s["attributes"].get("isCurrentSeason")), None)
-            season_id = current["id"] if current else None
-
-            if season_id:
-        # Новый запрос — берём именно ranked статистику
-                url_ranked_stats = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players/{player_id}/seasons/{season_id}/ranked"
-                resp_ranked = requests.get(url_ranked_stats, headers=headers).json()
-
-                ranked_stats = resp_ranked.get("data", {}).get("attributes", {}).get("rankedGameModeStats", {})
-                squad_ranked = ranked_stats.get("squad-fpp", {})
-
-                current_rank_point = squad_ranked.get("currentRankPoint", 0)
-                rounds_played = squad_ranked.get("roundsPlayed", 0)
-                damage_dealt = squad_ranked.get("damageDealt", 0)
-                kda = squad_ranked.get("kda", 0)
-
-                average_damage = damage_dealt / max(rounds_played, 1)
-
-        # Пример определения ранга по rating из pubglookup.com
+# Определяем ранг
         rank_thresholds = [
             ("bronze", 0, 1400),
             ("silver", 1400, 1799),
@@ -1014,6 +1014,7 @@ async def stat(ctx, member: discord.Member = None):
         ]
 
         rank_name = "bronze"
+        low, high = 0, 1400
         for rname, rlow, rhigh in rank_thresholds:
             if rlow <= current_rank_point <= rhigh:
                 rank_name = rname
