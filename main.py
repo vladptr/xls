@@ -1023,17 +1023,7 @@ async def stat(ctx, member: discord.Member = None):
                 low, high = 3400, 10000
 
 
-# Рисуем прогресс бар рейтинга вокруг иконки ранга
-        progress = 1.0 if rank_name == "master" else max(0.0, min((current_rank_point - low) / (high - low), 1.0))
 
-        draw.arc(
-            (center_rank[0] - radius_rank, center_rank[1] - radius_rank,
-             center_rank[0] + radius_rank, center_rank[1] + radius_rank),
-            start=start_angle,
-            end=end_angle,
-            fill=(255, 215, 0),
-            width=thickness_rank
-        )
 
 # Текст с текущими очками рейтинга
         score_text = f"{current_rank_point}/{high}" if rank_name != "master" else f"{current_rank_point}+"
@@ -1172,6 +1162,18 @@ async def stat(ctx, member: discord.Member = None):
         rank_x = width - 20 - rank_img_size
         rank_y = height // 2 - (rank_img_size // 2)
         img.paste(rank_img, (rank_x, rank_y), rank_img)
+
+# Рисуем прогресс бар рейтинга вокруг иконки ранга
+        progress = 1.0 if rank_name == "master" else max(0.0, min((current_rank_point - low) / (high - low), 1.0))
+
+        draw.arc(
+            (center_rank[0] - radius_rank, center_rank[1] - radius_rank,
+             center_rank[0] + radius_rank, center_rank[1] + radius_rank),
+            start=start_angle,
+            end=end_angle,
+            fill=(255, 215, 0),
+            width=thickness_rank
+        )
 
 # Статистика рейтингового режима слева от иконки ранга (с отступом 40 пикселей)
         stats_right_x = rank_x - 300
