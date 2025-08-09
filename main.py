@@ -37,7 +37,7 @@ channel_locks = {}
 room_modes = {}
 last_rename_times = {}
 
-PUBG_API_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJjNjZhZjAzMC01NjZmLTAxM2UtNWVlNi03NmNhZDljYTc2ODYiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzU0NjQ4NjYyLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InhscyJ9.RNogGBm2XdHmPhvUNzgGJWs6bOVNubMW48xxwt6bnXo"
+PUBG_API_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJjZmMyNDMyMC01NzZlLTAxM2UtMjAyNS0yYTI4ZjY0MjU0ZDEiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzU0NzU4MTk5LCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InhsczIifQ.C74qapztROZBtCVEWdob2w4B0-omdLJ-aaBfdfFK91E"
 PUBG_PLATFORM = "steam"
 print("PUBG API key:", repr(PUBG_API_KEY))
 
@@ -1246,23 +1246,7 @@ async def stat(ctx, member: discord.Member = None):
         img.save(filename)
         stat_msg = await ctx.send(file=discord.File(filename))
 
-        # Удаление
-        async def delete_later():
-            await asyncio.sleep(120)
-            try:
-                await stat_msg.delete()
-            except discord.NotFound:
-                pass
-            try:
-                os.remove(filename)
-            except FileNotFoundError:
-                pass
-
-        bot.loop.create_task(delete_later())
-
-    except Exception as e:
-        await ctx.send(f"❌ Ошибка в команде stat: {e}")
-
+    
 
 @bot.command()
 async def setexp(ctx, member: discord.Member = None):
