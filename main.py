@@ -1168,15 +1168,6 @@ async def stat(ctx, member: discord.Member = None):
 # Рисуем прогресс бар рейтинга вокруг иконки ранга
         progress = 1.0 if rank_name == "master" else max(0.0, min((current_rank_point - low) / (high - low), 1.0))
 
-        draw.arc(
-            (center_rank[0] - radius_rank, center_rank[1] - radius_rank,
-             center_rank[0] + radius_rank, center_rank[1] + radius_rank),
-            start=start_angle,
-            end=end_angle,
-            fill=(255, 215, 0),
-            width=thickness_rank
-        )
-
 # Статистика рейтингового режима слева от иконки ранга (с отступом 40 пикселей)
         stats_right_x = rank_x - 300
         stats_right_y = rank_y - 5
@@ -1214,17 +1205,13 @@ async def stat(ctx, member: discord.Member = None):
         radius_rank = int((rank_img_size // 2 + 10)*0.8)
         thickness_rank = 6
         center_rank = (rank_x + rank_img_size // 2, rank_y + rank_img_size // 2)
-
+        
         draw.ellipse(
             (center_rank[0] - radius_rank, center_rank[1] - radius_rank,
              center_rank[0] + radius_rank, center_rank[1] + radius_rank),
             outline=(80, 80, 80),
             width=thickness_rank
         )
-
-        progress = 1.0 if rank_name == "master" else max(0.0, min((current_rank_point - low) / (high - low), 1.0))
-        start_angle = -90
-        end_angle = start_angle + int(360 * progress)
 
         draw.arc(
             (center_rank[0] - radius_rank, center_rank[1] - radius_rank,
