@@ -1144,7 +1144,7 @@ async def stat(ctx, member: discord.Member = None):
         print(f"Damage: {normal_squad_damage}, Rounds: {normal_squad_rounds}")
         
         stats_left_lines = [
-            f"Средний урон в отряде FPP: {normal_squad_avg_damage:.1f}",
+            f"ADR public FPP: {normal_squad_avg_damage:.1f}",
             f"Среднее время: {avg_hours:.1f} ч.",
             f"Общее время: {total_hours:.1f} ч.",
             f"Уровень: {level}",
@@ -1176,7 +1176,7 @@ async def stat(ctx, member: discord.Member = None):
 
 # Статистика рейтингового режима слева от иконки ранга (с отступом 40 пикселей)
         stats_right_x = rank_x - 300
-        stats_right_y = rank_y - 5
+        stats_right_y = rank_y - 10
 
         duo_ranked = ranked_stats.get("duo-fpp", {})
         squad_ranked = ranked_stats.get("squad-fpp", {})
@@ -1195,10 +1195,13 @@ async def stat(ctx, member: discord.Member = None):
 
         line_height = 22
         stats_right_lines = [
-            f"Рейтинговый режим:",
-            f"Отряд FPP:",
+            f"Ranked:",
+            f"Squad FPP:",
             f"  Убийств в среднем (KDA): {kda:.2f}",
-            f"  Средний урон: {average_damage:.1f}",
+            f"  ADR ranked FPP: {average_damage:.1f}",
+            f"Duo FPP:",
+            f"  Убийств в среднем (KDA): {duo_avg_kills:.2f}",
+            f"  ADR ranked FPP: {duo_average_damage:.1f}",
         ]
 
 
