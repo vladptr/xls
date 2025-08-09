@@ -31,6 +31,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 
+
 setup_messages = {}
 channel_locks = {}
 room_modes = {}
