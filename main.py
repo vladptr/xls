@@ -966,41 +966,15 @@ async def stat(ctx, member: discord.Member = None):
             "Accept": "application/vnd.api+json"
         }
         #поиск по айди
-        url_player = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players?filter[playerNames]={pubg_name}"
-        resp_player = requests.get(url_player, headers=headers).json()
-        print(resp_player)
+        url_ranked_stats = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players/{player_id}/seasons/{season_id}/ranked"
+        resp_ranked = requests.get(url_ranked_stats, headers=headers).json()
 
-        player_id = resp_player["data"][0]["id"] if "data" in resp_player and resp_player["data"] else None
+        ranked_stats = resp_ranked.get("data", {}).get("attributes", {}).get("rankedGameModeStats", {})
+        squad_ranked = ranked_stats.get("squad-fpp", {})
 
-        rating = 0
-        rank_name = "unknown"
+        current_rank_point = squad_ranked.get("currentRankPoint", 0)
         
-        if player_id:
-            url_lookup = f"https://pubglookup.com/players/steam/{pubg_name}"
-            headers_lookup = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                              "(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-                "Referer": "https://pubglookup.com/"
-            }
-            r = requests.get(url_lookup, headers=headers_lookup)
-            if r.status_code == 200:
-                soup = BeautifulSoup(r.text, "html.parser")
-                rank_details = soup.find("div", class_="rank-details")
-                if rank_details:
-                    points_h3 = rank_details.find("h3")
-                    if points_h3:
-                        points_text = points_h3.get_text(strip=True).replace("\xa0", "").replace("Points:", "").strip()
-                        try:
-                            rating = int(re.sub(r"\D", "", points_text))
-                        except:
-                            rating = 0
-                        print(f"Очки с pubglookup.com: {rating}")
-                    else:
-                        print("Не найден элемент с очками на странице pubglookup.com")
-                else:
-                    print("Не найден блок с рейтингом на pubglookup.com")
-            else:
-                print(f"Ошибка запроса к pubglookup.com: статус {r.status_code}")
+        
 
         average_damage = 0
         duo_stats = {}
@@ -1038,16 +1012,16 @@ async def stat(ctx, member: discord.Member = None):
             ("diamond", 3000, 3399),
             ("master", 3400, 10000),
         ]
-        rank_simple = "bronze"
-        low, high = 0, 0
+
+        rank_name = "bronze"
         for rname, rlow, rhigh in rank_thresholds:
             if rlow <= current_rank_point <= rhigh:
-                rank_simple = rname
+                rank_name = rname
                 low, high = rlow, rhigh
                 break
         else:
             if current_rank_point > 3400:
-                rank_simple = "master"
+                rank_name = "master"
                 low, high = 3400, 10000
 
 # Рисуем прогресс бар рейтинга вокруг иконки ранга
