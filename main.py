@@ -1014,18 +1014,19 @@ async def stat(ctx, member: discord.Member = None):
             season_id = current["id"] if current else None
 
             if season_id:
-                url_stats = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players/{player_id}/seasons/{season_id}"
-                resp_stats = requests.get(url_stats, headers=headers).json()
+        # Новый запрос — берём именно ranked статистику
+                url_ranked_stats = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players/{player_id}/seasons/{season_id}/ranked"
+                resp_ranked = requests.get(url_ranked_stats, headers=headers).json()
 
-                game_modes = resp_stats["data"]["attributes"]["gameModeStats"]
-                ranked_stats = game_modes.get("squad-fpp-ranked", {})
+                ranked_stats = resp_ranked.get("data", {}).get("attributes", {}).get("rankedGameModeStats", {})
+                squad_ranked = ranked_stats.get("squad-fpp", {})
 
-                squad_stats = game_modes.get("squad-fpp", {})
-                rounds = squad_stats.get("roundsPlayed", 0)
-                if rounds > 0:
-                    average_damage = squad_stats.get("damageDealt", 0) / rounds
+                current_rank_point = squad_ranked.get("currentRankPoint", 0)
+                rounds_played = squad_ranked.get("roundsPlayed", 1)
+                damage_dealt = squad_ranked.get("damageDealt", 0)
+                kda = squad_ranked.get("kda", 0)
 
-                duo_stats = game_modes.get("duo-fpp", {})
+                average_damage = damage_dealt / max(rounds_played, 1)
 
         # Пример определения ранга по rating из pubglookup.com
         rank_thresholds = [
