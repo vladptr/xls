@@ -1022,7 +1022,7 @@ async def stat(ctx, member: discord.Member = None):
                 squad_ranked = ranked_stats.get("squad-fpp", {})
 
                 current_rank_point = squad_ranked.get("currentRankPoint", 0)
-                rounds_played = squad_ranked.get("roundsPlayed", 1)
+                rounds_played = squad_ranked.get("roundsPlayed", 0)
                 damage_dealt = squad_ranked.get("damageDealt", 0)
                 kda = squad_ranked.get("kda", 0)
 
@@ -1208,12 +1208,11 @@ async def stat(ctx, member: discord.Member = None):
         stats_right_lines = [
             f"Рейтинговый режим:",
             f"Отряд FPP:",
-            f"  Убийств в среднем: {squad_avg_kills:.2f}",
-            f"  Средний урон: {squad_avg_damage:.1f}",
-            f"Дуо FPP:",
-            f"  Убийств в среднем: {duo_avg_kills:.2f}",
-            f"  Средний урон: {duo_avg_damage:.1f}",
+            f"  Очки рейтинга: {current_rank_point}",
+            f"  Убийств в среднем (KDA): {kda:.2f}",
+            f"  Средний урон: {average_damage:.1f}",
         ]
+
 
         for i, line in enumerate(stats_right_lines):
             y = stats_right_y + i * line_height
