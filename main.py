@@ -1201,7 +1201,7 @@ async def stat(ctx, member: discord.Member = None):
             f"  ADR ranked FPP: {average_damage:.1f}",
             f"Duo FPP:",
             f"  Убийств в среднем (KDA): {duo_avg_kills:.2f}",
-            f"  ADR ranked FPP: {duo_average_damage:.1f}",
+            f"  ADR ranked FPP: {duo_avg_damage:.1f}",
         ]
 
 
