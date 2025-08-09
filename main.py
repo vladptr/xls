@@ -973,36 +973,43 @@ async def stat(ctx, member: discord.Member = None):
         player_id = resp_player["data"][0]["id"] if "data" in resp_player and resp_player["data"] else None
 
         rating = 0
+        rank_name = "unknown"
+        
         if player_id:
-            try:
-                url_dak = f"https://dak.gg/profile/steam/{pubg_name}"
-                headers_dak = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                                    "(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-                    "Referer": "https://dak.gg/"
-                }
-                r = requests.get(url_dak, headers=headers_dak)
-                if r.status_code == 200:
-                    soup = BeautifulSoup(r.text, "html.parser")
-                # Ищем рейтинг RP - класс Infos_rp, а не Infos__rp
-                    dd_rp = soup.find("dd", class_="Infos_rp")
-                    if dd_rp:
-                        text = dd_rp.get_text(strip=True).replace("\xa0", "").replace("RP", "")
-                        rating = int(re.sub(r"\D", "", text))
-                        print(f"Найден рейтинг с dak.gg: {rating}")
+            # Парсим рейтинг и ранг с pubglookup.com
+            url_lookup = f"https://pubglookup.com/players/steam/{pubg_name}"
+            headers_lookup = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                              "(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+                "Referer": "https://pubglookup.com/"
+            }
+            r = requests.get(url_lookup, headers=headers_lookup)
+            if r.status_code == 200:
+                soup = BeautifulSoup(r.text, "html.parser")
+                rank_details = soup.find("div", class_="rank-details")
+                if rank_details:
+                    rank_h2 = rank_details.find("h2")
+                    points_h3 = rank_details.find("h3")
+                    if rank_h2 and points_h3:
+                        rank_name = rank_h2.get_text(strip=True)
+                        points_text = points_h3.get_text(strip=True).replace("\xa0", "").replace("Points:", "").strip()
+                        try:
+                            rating = int(re.sub(r"\D", "", points_text))
+                        except:
+                            rating = 0
+                        print(f"Парсинг с pubglookup.com: Ранг = {rank_name}, Очки = {rating}")
                     else:
-                        print("Рейтинг RP не найден на странице dak.gg")
+                        print("Не удалось найти ранг или очки на странице pubglookup.com")
                 else:
-                    print(f"Ошибка запроса к dak.gg: статус {r.status_code}")
-            except Exception as e:
-                print("Ошибка при парсинге dak.gg:", e)
+                    print("Не найден блок с рейтингом на pubglookup.com")
+            else:
+                print(f"Ошибка запроса к pubglookup.com: статус {r.status_code}")
 
         average_damage = 0
         duo_stats = {}
         squad_stats = {}
 
         if player_id:
-                # Получаем список сезонов
             url_seasons = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/seasons"
             resp_seasons = requests.get(url_seasons, headers=headers).json()
             seasons = resp_seasons.get("data", [])
@@ -1023,13 +1030,7 @@ async def stat(ctx, member: discord.Member = None):
 
                 duo_stats = game_modes.get("duo-fpp", {})
 
-        return {
-            "rating": rating,
-            "average_damage": average_damage,
-            "duo_stats": duo_stats,
-            "squad_stats": squad_stats,
-        }
-            
+        # Пример определения ранга по rating из pubglookup.com
         rank_thresholds = [
             ("bronze", 0, 1400),
             ("silver", 1400, 1799),
@@ -1039,18 +1040,14 @@ async def stat(ctx, member: discord.Member = None):
             ("diamond", 3000, 3399),
             ("master", 3400, 10000),
         ]
-
-        rank_name = "bronze"  # по умолчанию
-        low, high = 0, 1400
+        rank_simple = "bronze"
         for rname, rlow, rhigh in rank_thresholds:
             if rlow <= rating <= rhigh:
-                rank_name = rname
-                low, high = rlow, rhigh
+                rank_simple = rname
                 break
         else:
             if rating > 3400:
-                rank_name = "master"
-                low, high = 3400, 3400
+                rank_simple = "master"
                 
         # Получение данных из Supabase
         row = supabase.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
