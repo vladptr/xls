@@ -1223,7 +1223,6 @@ async def stat(ctx, member: discord.Member = None):
         stats_right_lines = [
             f"Рейтинговый режим:",
             f"Отряд FPP:",
-            f"  Очки рейтинга: {current_rank_point}",
             f"  Убийств в среднем (KDA): {kda:.2f}",
             f"  Средний урон: {average_damage:.1f}",
         ]
@@ -1246,7 +1245,7 @@ async def stat(ctx, member: discord.Member = None):
             width=thickness_rank
         )
 
-        progress = 1.0 if rank_name == "master" else max(0.0, min((rating - low) / (high - low), 1.0))
+        progress = 1.0 if rank_name == "master" else max(0.0, min((current_rank_point - low) / (high - low), 1.0))
         start_angle = -90
         end_angle = start_angle + int(360 * progress)
 
@@ -1259,7 +1258,7 @@ async def stat(ctx, member: discord.Member = None):
             width=thickness_rank
         )
 
-        score_text = f"{rating}/{high}" if rank_name != "master" else f"{rating}+"
+        score_text = f"{current_rank_point}/{high}" if rank_name != "master" else f"{current_rank_point}+"
         score_font = ImageFont.truetype(font_path, 18)
         bbox = draw.textbbox((0, 0), score_text, font=score_font)
         text_width = bbox[2] - bbox[0]
