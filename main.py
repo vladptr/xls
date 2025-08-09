@@ -51,7 +51,7 @@ intents.voice_states = True
 intents.messages = True
 intents.message_content = True
 
-rating = 0
+
 
 service_account_info = json.loads(os.environ["GOOGLE_CREDS_JSON"])
 
@@ -976,7 +976,6 @@ async def stat(ctx, member: discord.Member = None):
         rank_name = "unknown"
         
         if player_id:
-            # Парсим рейтинг и ранг с pubglookup.com
             url_lookup = f"https://pubglookup.com/players/steam/{pubg_name}"
             headers_lookup = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -988,18 +987,16 @@ async def stat(ctx, member: discord.Member = None):
                 soup = BeautifulSoup(r.text, "html.parser")
                 rank_details = soup.find("div", class_="rank-details")
                 if rank_details:
-                    rank_h2 = rank_details.find("h2")
                     points_h3 = rank_details.find("h3")
-                    if rank_h2 and points_h3:
-                        rank_name = rank_h2.get_text(strip=True)
+                    if points_h3:
                         points_text = points_h3.get_text(strip=True).replace("\xa0", "").replace("Points:", "").strip()
                         try:
                             rating = int(re.sub(r"\D", "", points_text))
                         except:
                             rating = 0
-                        print(f"Парсинг с pubglookup.com: Ранг = {rank_name}, Очки = {rating}")
+                        print(f"Очки с pubglookup.com: {rating}")
                     else:
-                        print("Не удалось найти ранг или очки на странице pubglookup.com")
+                        print("Не найден элемент с очками на странице pubglookup.com")
                 else:
                     print("Не найден блок с рейтингом на pubglookup.com")
             else:
