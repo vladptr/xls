@@ -28,6 +28,8 @@ from datetime import datetime, UTC
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from io import BytesIO
 import requests
+from bs4 import BeautifulSoup
+import re
 
 setup_messages = {}
 channel_locks = {}
