@@ -1026,7 +1026,7 @@ async def stat(ctx, member: discord.Member = None):
                 low, high = 3400, 10000
 
 # Рисуем прогресс бар рейтинга вокруг иконки ранга
-        progress = 1.0 if rank_simple == "master" else max(0.0, min((current_rank_point - low) / (high - low), 1.0))
+        progress = 1.0 if rank_name == "master" else max(0.0, min((current_rank_point - low) / (high - low), 1.0))
 
         draw.arc(
             (center_rank[0] - radius_rank, center_rank[1] - radius_rank,
@@ -1038,7 +1038,7 @@ async def stat(ctx, member: discord.Member = None):
         )
 
 # Текст с текущими очками рейтинга
-        score_text = f"{current_rank_point}/{high}" if rank_simple != "master" else f"{current_rank_point}+"
+        score_text = f"{current_rank_point}/{high}" if rank_name != "master" else f"{current_rank_point}+"
                 
         # Получение данных из Supabase
         row = supabase.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
