@@ -1136,7 +1136,8 @@ async def stat(ctx, member: discord.Member = None):
         normal_squad_damage = squad_stats.get("damageDealt", 0)
         normal_squad_rounds = squad_stats.get("roundsPlayed", 1)
         normal_squad_avg_damage = normal_squad_damage / max(normal_squad_rounds, 1)
-
+        print(f"Damage: {normal_squad_damage}, Rounds: {normal_squad_rounds}")
+        
         stats_left_lines = [
             f"Средний урон в отряде FPP: {normal_squad_avg_damage:.1f}",
             f"Среднее время: {avg_hours:.1f} ч.",
