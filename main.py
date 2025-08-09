@@ -957,7 +957,6 @@ async def stat(ctx, member: discord.Member = None):
         member = member or ctx.author
         user_id = member.id
 
-# Получаем ник для поиска
         pubg_name = member.display_name.split(" ")[0].strip()
         print(f"PUBG поиск ника: {pubg_name}")
 
@@ -966,7 +965,7 @@ async def stat(ctx, member: discord.Member = None):
             "Accept": "application/vnd.api+json"
         }
 
-# Сначала получаем player_id по имени
+# Получаем player_id по имени
         url_player = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players?filter[playerNames]={pubg_name}"
         resp_player = requests.get(url_player, headers=headers).json()
 
@@ -999,7 +998,7 @@ async def stat(ctx, member: discord.Member = None):
         rounds_played = squad_ranked.get("roundsPlayed", 0)
         damage_dealt = squad_ranked.get("damageDealt", 0)
         kda = squad_ranked.get("kda", 0)
-
+    
         average_damage = damage_dealt / max(rounds_played, 1)
 
 # Определяем ранг
@@ -1024,6 +1023,7 @@ async def stat(ctx, member: discord.Member = None):
             if current_rank_point > 3400:
                 rank_name = "master"
                 low, high = 3400, 10000
+
 
 # Рисуем прогресс бар рейтинга вокруг иконки ранга
         progress = 1.0 if rank_name == "master" else max(0.0, min((current_rank_point - low) / (high - low), 1.0))
