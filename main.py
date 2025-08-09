@@ -962,24 +962,52 @@ async def stat(ctx, member: discord.Member = None):
             "Authorization": f"Bearer {PUBG_API_KEY}",
             "Accept": "application/vnd.api+json"
         }
-
-        # 1. Получаем ID игрока
+        #поиск по айди
         url_player = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players?filter[playerNames]={pubg_name}"
         resp_player = requests.get(url_player, headers=headers).json()
         print(resp_player)
         player_id = resp_player["data"][0]["id"] if "data" in resp_player and resp_player["data"] else None
+
+        # Новый блок: попытка спарсить рейтинг с dak.gg
+        rating = 0
+        if player_id:
+            try:
+                # Формируем URL профиля dak.gg (steam)
+                url_dak = f"https://dak.gg/profile/steam/{pubg_name}"
+                headers_dak = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                                  "(KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+                    "Referer": "https://dak.gg/"
+                }
+                r = requests.get(url_dak, headers=headers_dak)
+                if r.status_code == 200:
+                    soup = BeautifulSoup(r.text, "html.parser")
+                    # Ищем рейтинг RP (например, <dd class="Infos__rp">3 000 RP</dd>)
+                    dd_rp = soup.find("dd", class_="Infos__rp")
+                    if dd_rp:
+                        # Убираем все пробелы, &nbsp; и буквы, оставляем число
+                        text = dd_rp.get_text(strip=True).replace("\xa0", "").replace("RP", "")
+                        rating = int(re.sub(r"\D", "", text))
+                        print(f"Найден рейтинг с dak.gg: {rating}")
+                    else:
+                        print("Рейтинг RP не найден на странице dak.gg")
+                else:
+                    print(f"Ошибка запроса к dak.gg: статус {r.status_code}")
+            except Exception as e:
+                print("Ошибка при парсинге dak.gg:", e)
 
         average_damage = 0
         duo_stats = {}
         squad_stats = {}
         
         if player_id:
-    # 2) Получаем список сезонов, чтобы найти текущий
+            # 2) Получаем список сезонов, чтобы найти текущий
             url_seasons = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/seasons"
             resp_seasons = requests.get(url_seasons, headers=headers).json()
             seasons = resp_seasons.get("data", [])
             current = next((s for s in seasons if s["attributes"].get("isCurrentSeason")), None)
             season_id = current["id"] if current else None
+
             if not player_id:
                 ranked_stats = {}
                 squad_stats = {}
@@ -987,25 +1015,22 @@ async def stat(ctx, member: discord.Member = None):
                 rank_name = "bronze"
                 rating = 0
             if season_id:
-        # 3) Получаем статистику по текущему сезону
+                # 3) Получаем статистику по текущему сезону
                 url_stats = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players/{player_id}/seasons/{season_id}"
                 resp_stats = requests.get(url_stats, headers=headers).json()
 
                 game_modes = resp_stats["data"]["attributes"]["gameModeStats"]
                 ranked_stats = game_modes.get("squad-fpp-ranked", {})
 
-        # Берём squad-fpp для урона (как в твоём коде)
+                # Берём squad-fpp для урона (как в твоём коде)
                 squad_stats = game_modes.get("squad-fpp", {})
                 rounds = squad_stats.get("roundsPlayed", 0)
                 if rounds > 0:
                     average_damage = squad_stats.get("damageDealt", 0) / rounds
 
-        # Получаем duo-fpp и squad-fpp для рейтинга (убийства и урон)
+                # Получаем duo-fpp и squad-fpp для рейтинга (убийства и урон)
                 duo_stats = game_modes.get("duo-fpp", {})
                 squad_stats = game_modes.get("squad-fpp", {})
-                # Берём рейтинг из resp_stats["data"]["attributes"]["rankScore"] или подобное
-                # Пока пример с рандомным рейтингом для теста (замени на актуальное поле рейтинга)
-                rating = resp_stats["data"]["attributes"].get("rankScore", 0)
         
         rank_thresholds = [
             ("bronze", 0, 1400),
