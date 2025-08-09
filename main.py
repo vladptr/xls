@@ -1244,7 +1244,8 @@ async def stat(ctx, member: discord.Member = None):
         img.save(filename)
         stat_msg = await ctx.send(file=discord.File(filename))
 
-    
+    except Exception as e:
+        await ctx.send(f"Ошибка в команде stat: {e}")
 
 @bot.command()
 async def setexp(ctx, member: discord.Member = None):
