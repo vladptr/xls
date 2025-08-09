@@ -991,8 +991,6 @@ async def stat(ctx, member: discord.Member = None):
 
         ranked_stats = resp_ranked.get("data", {}).get("attributes", {}).get("rankedGameModeStats", {})
         squad_ranked = ranked_stats.get("squad-fpp", {})
-        normal_stats = resp_ranked.get("data", {}).get("attributes", {}).get("gameModeStats", {})
-        squad_stats = normal_stats.get("squad-fpp", {})
         
         current_rank_point = squad_ranked.get("currentRankPoint", 0)
         rounds_played = squad_ranked.get("roundsPlayed", 0)
@@ -1000,6 +998,13 @@ async def stat(ctx, member: discord.Member = None):
         kda = squad_ranked.get("kda", 0)
     
         average_damage = damage_dealt / max(rounds_played, 1)
+#Обычная статистика
+        url_season_stats = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players/{player_id}/seasons/{season_id}"
+        resp_season_stats = requests.get(url_season_stats, headers=headers).json()
+
+        game_mode_stats = resp_season_stats.get("data", {}).get("attributes", {}).get("gameModeStats", {})
+        squad_stats = game_mode_stats.get("squad-fpp", {})
+
 
 # Определяем ранг
         rank_thresholds = [
