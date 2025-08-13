@@ -34,6 +34,8 @@ setup_messages = {}
 channel_locks = {}
 room_modes = {}
 last_rename_times = {}
+created_channels = {}
+channel_bases = {}
 
 PUBG_API_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJjZmMyNDMyMC01NzZlLTAxM2UtMjAyNS0yYTI4ZjY0MjU0ZDEiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzU0NzU4MTk5LCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InhsczIifQ.C74qapztROZBtCVEWdob2w4B0-omdLJ-aaBfdfFK91E"
 PUBG_PLATFORM = "steam"
@@ -535,10 +537,6 @@ async def on_voice_state_update(member, before, after):
                 "start_time": now
             }).execute()
 
-            # Проверяем, что данные вернулись
-            if not response.data:
-                print(f"❌ Ошибка при вставке сессии: пустой ответ от Supabase")
-
         elif before.channel and not after.channel:
             if before.channel.id in BLACKLISTED_CHANNELS:
                 return
@@ -664,6 +662,15 @@ async def on_voice_state_update(member, before, after):
         view = RoomSetupView(member.id, new_channel.id, mode)
         msg = await new_channel.send(f"{member.mention}, настройте комнату:", view=view)
         setup_messages[new_channel.id] = msg
+
+        try:
+            ctx = await bot.get_context(msg)  # используем сообщение в новой комнате
+            command = bot.get_command("stat")
+            stat_msg = await command.callback(ctx, member=member)
+            if stat_msg:
+                bot.voice_stat_messages[member.id] = stat_msg
+        except Exception as e:
+            print(f"❌ Ошибка при отправке статистики в созданной комнате: {e}")
 
 
 
