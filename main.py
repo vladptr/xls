@@ -561,9 +561,10 @@ async def on_voice_state_update(member, before, after):
     try:
         # Пользователь зашёл в любой канал (в том числе создаёт комнату)
         if after.channel and (not before.channel or before.channel.id != after.channel.id):
-            if after.channel.id not in BLACKLISTED_CHANNELS:
-                # Добавляем в очередь на отправку статистики
+    # Игнорируем блеклист и триггерные каналы создания комнат
+            if after.channel.id not in BLACKLISTED_CHANNELS and after.channel.name not in TRIGGER_CHANNELS:
                 await enqueue_stat(member, after.channel)
+
 
         # Пользователь вышел из канала
         if before.channel and (not after.channel or before.channel.id != after.channel.id):
