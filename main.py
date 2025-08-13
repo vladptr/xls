@@ -557,10 +557,14 @@ async def on_voice_state_update(member, before, after):
         # Пользователь зашёл в любой канал (в том числе создаёт комнату)
         if after.channel and (not before.channel or before.channel.id != after.channel.id):
             if after.channel.id not in BLACKLISTED_CHANNELS:
+                # Добавляем в очередь на отправку статистики
                 await enqueue_stat(member, after.channel)
 
         # Пользователь вышел из канала
         if before.channel and (not after.channel or before.channel.id != after.channel.id):
+            # Отменяем отправку статистики, если она ещё не дошла
+            pending_stats.discard(user_id)
+            # Удаляем сообщение, если уже отправлено
             msg = voice_stat_messages.pop(user_id, None)
             if msg:
                 try:
@@ -699,7 +703,9 @@ async def on_voice_state_update(member, before, after):
 
         new_channel = await guild.create_voice_channel(new_name, category=category)
         await member.move_to(new_channel)
-        await stat_queue.put((member, new_channel))
+        await enqueue_stat(member, new_channel)
+        
+        
         created_channels[new_channel.id] = member.id
         channel_bases[new_channel.id] = base_name
 
