@@ -533,6 +533,9 @@ async def stat_worker():
     while True:
         member, channel = await stat_queue.get()
         try:
+            if channel.id in BLACKLISTED_CHANNELS:
+                continue  # пропускаем каналы из черного списка
+
             temp_msg = await channel.send(".")
             ctx = await bot.get_context(temp_msg)
             command = bot.get_command("stat")
