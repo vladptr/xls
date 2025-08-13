@@ -524,7 +524,29 @@ voice_stat_messages = {}
 async def on_voice_state_update(member, before, after):
     user_id = member.id
     now = datetime.now(UTC).timestamp()
+    try:
+        if after.channel and (not before.channel or before.channel.id != after.channel.id):
+            if after.channel.id in BLACKLISTED_CHANNELS:
+                return
 
+            # Отправляем статистику
+            temp_msg = await after.channel.send("Загрузка статистики...")
+            ctx = await bot.get_context(temp_msg)
+            command = bot.get_command("stat")
+            stat_msg = await command.callback(ctx, member=member)
+            if stat_msg:
+                voice_stat_messages[user_id] = stat_msg
+
+            await temp_msg.delete()
+
+        elif before.channel and not after.channel:
+            # Пользователь вышел — удаляем его статистику
+            msg = voice_stat_messages.pop(user_id, None)
+            if msg:
+                try:
+                    await msg.delete()
+                except discord.NotFound:
+                    pass
    
     try:
         if after.channel and not before.channel:
@@ -663,14 +685,7 @@ async def on_voice_state_update(member, before, after):
         msg = await new_channel.send(f"{member.mention}, настройте комнату:", view=view)
         setup_messages[new_channel.id] = msg
 
-        try:
-            ctx = await bot.get_context(msg)  # используем сообщение в новой комнате
-            command = bot.get_command("stat")
-            stat_msg = await command.callback(ctx, member=member)
-            if stat_msg:
-                bot.voice_stat_messages[member.id] = stat_msg
-        except Exception as e:
-            print(f"❌ Ошибка при отправке статистики в созданной комнате: {e}")
+        
 
 
 
