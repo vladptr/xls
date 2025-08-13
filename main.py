@@ -545,18 +545,21 @@ async def on_voice_state_update(member, before, after):
     user_id = member.id
     now = datetime.now(UTC).timestamp()
     try:
-        if after.channel and not before.channel:
-            if after.channel.id in BLACKLISTED_CHANNELS:
-                return
-            await stat_queue.put((member, after.channel))
+        # Пользователь зашёл в любой канал (в том числе создаёт комнату)
+        if after.channel and (not before.channel or before.channel.id != after.channel.id):
+            if after.channel.id not in BLACKLISTED_CHANNELS:
+                # Добавляем в очередь на отправку статистики
+                await stat_queue.put((member, after.channel))
 
-        elif before.channel and not after.channel:
-            msg = voice_stat_messages.pop(member.id, None)
+        # Пользователь вышел из канала
+        if before.channel and (not after.channel or before.channel.id != after.channel.id):
+            msg = voice_stat_messages.pop(user_id, None)
             if msg:
                 try:
                     await msg.delete()
                 except discord.NotFound:
                     pass
+
     except Exception as e:
         print(f"❌ Ошибка при обновлении статистики: {e}")
         
@@ -688,6 +691,7 @@ async def on_voice_state_update(member, before, after):
 
         new_channel = await guild.create_voice_channel(new_name, category=category)
         await member.move_to(new_channel)
+        await stat_queue.put((member, new_channel))
         created_channels[new_channel.id] = member.id
         channel_bases[new_channel.id] = base_name
 
