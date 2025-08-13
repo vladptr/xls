@@ -532,6 +532,11 @@ voice_stat_messages = {}
 async def stat_worker():
     while True:
         member, channel = await stat_queue.get()
+        member_id = member.id
+        
+        if member_id not in pending_stats:
+            continue
+        
         try:
             if channel.id in BLACKLISTED_CHANNELS:
                 continue  # пропускаем каналы из черного списка
@@ -568,8 +573,6 @@ async def on_voice_state_update(member, before, after):
 
         # Пользователь вышел из канала
         if before.channel and (not after.channel or before.channel.id != after.channel.id):
-            # Отменяем отправку статистики, если она ещё не дошла
-            pending_stats.discard(user_id)
             # Удаляем сообщение, если уже отправлено
             msg = voice_stat_messages.pop(user_id, None)
             if msg:
@@ -577,7 +580,8 @@ async def on_voice_state_update(member, before, after):
                     await msg.delete()
                 except discord.NotFound:
                     pass
-
+            pending_stats.discard(user_id)
+            
     except Exception as e:
         print(f"❌ Ошибка при обновлении статистики: {e}")
         
