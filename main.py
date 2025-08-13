@@ -530,7 +530,7 @@ async def on_voice_state_update(member, before, after):
                 return
 
             # Отправляем статистику
-            #temp_msg = await after.channel.send("Загрузка статистики...")
+            temp_msg = await after.channel.send("Загрузка статистики...")
             ctx = await bot.get_context(temp_msg)
             command = bot.get_command("stat")
             stat_msg = await command.callback(ctx, member=member)
