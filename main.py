@@ -532,7 +532,7 @@ async def stat_worker():
             await temp_msg.delete()
         except Exception as e:
             print(f"❌ Ошибка отправки статистики для {member.display_name}: {e}")
-        await asyncio.sleep(10)  # задержка 10 секунд между пользователями
+        await asyncio.sleep(20)  # задержка 10 секунд между пользователями
         stat_queue.task_done()
 
 @bot.event
