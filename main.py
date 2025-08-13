@@ -530,7 +530,7 @@ async def on_voice_state_update(member, before, after):
                 return
 
             # Отправляем статистику
-            temp_msg = await after.channel.send("Загрузка статистики...")
+            #temp_msg = await after.channel.send("Загрузка статистики...")
             ctx = await bot.get_context(temp_msg)
             command = bot.get_command("stat")
             stat_msg = await command.callback(ctx, member=member)
@@ -547,7 +547,9 @@ async def on_voice_state_update(member, before, after):
                     await msg.delete()
                 except discord.NotFound:
                     pass
-   
+    except Exception as e:
+        print(f"❌ Ошибка при обновлении статистики: {e}")
+        
     try:
         if after.channel and not before.channel:
             if after.channel.id in BLACKLISTED_CHANNELS:
