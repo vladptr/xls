@@ -556,19 +556,21 @@ async def on_voice_state_update(member, before, after):
                 print(f"❌ Ошибка при удалении сессии")
 
             # Обновляем/вставляем время в voice_time
-            time_row = supabase.table("voice_time").select("total_seconds").eq("user_id", user_id).limit(1).execute()
+            time_row = supabase.table("voice_time").select("*").eq("user_id", user_id).limit(1).execute()
             if time_row.data:
-                total_seconds = time_row.data[0]["total_seconds"] + duration
-                upd_resp = supabase.table("voice_time").update({"total_seconds": total_seconds}).eq("user_id", user_id).execute()
-                if not upd_resp.data:
-                    print(f"❌ Ошибка при обновлении времени для пользователя {user_id}")
+                total_seconds_week = time_row.data[0]["total_seconds"] + duration
+                total_seconds_all_time = time_row.data[0].get("total_seconds_all_time", 0) + duration
+
+                supabase.table("voice_time").update({
+                    "total_seconds": total_seconds_week,
+                    "total_seconds_all_time": total_seconds_all_time
+                }).eq("user_id", user_id).execute()
             else:
-                ins_resp = supabase.table("voice_time").insert({
+                supabase.table("voice_time").insert({
                     "user_id": user_id,
-                    "total_seconds": duration
+                    "total_seconds": duration,
+                    "total_seconds_all_time": duration
                 }).execute()
-                if not ins_resp.data:
-                    print(f"❌ Ошибка при вставке нового времени для пользователя {user_id}")
 
     except Exception as e:
         print(f"❌ Общая ошибка при обновлении статистики: {e}")
@@ -596,14 +598,23 @@ async def on_voice_state_update(member, before, after):
                 old_msg = setup_messages.get(before.channel.id)
                 if old_msg:
                     try:
-                        await old_msg.delete()
-                        print("✅ Старое сообщение успешно удалено.")
+                        await old_msg.edit(
+                            content=(
+                                f"Владелец комнаты вышел. Новый владелец: {new_owner.mention}\n"
+                                f"{new_owner.mention}, настройте комнату:"
+                            )
+                        )
+                        print("✅ Старое сообщение успешно обновлено.")
                     except discord.NotFound:
-                        print("⚠️ Сообщение уже было удалено ранее.")
+            # Если вдруг сообщения нет, создаём новое
+                        new_msg = await before.channel.send(
+                            f"Владелец комнаты вышел. Новый владелец: {new_owner.mention}\n"
+                            f"{new_owner.mention}, настройте комнату:"
+                        )
+                        setup_messages[before.channel.id] = new_msg
+                        print("⚠️ Старое сообщение не найдено, создано новое.")
                     except Exception as e:
-                        print(f"❌ Ошибка при удалении сообщения: {e}")
-                    finally:
-                        setup_messages.pop(before.channel.id, None)
+                        print(f"❌ Ошибка при редактировании сообщения: {e}")
 
                 overwrite = before.channel.overwrites_for(new_owner)
                 overwrite.manage_channels = True
@@ -613,13 +624,11 @@ async def on_voice_state_update(member, before, after):
 
                 mode = room_modes.get(before.channel.id, "default")
                 view = RoomSetupView(new_owner.id, before.channel.id, mode)
-                new_msg = await before.channel.send(
-                    f"Владелец комнаты вышел. Новый владелец: {new_owner.mention}\n"
-                    f"{new_owner.mention}, настройте комнату:",
-                    view=view
-                )
-                setup_messages[before.channel.id] = new_msg
-                print(f"Назначен новый владелец: {new_owner.name} для канала {before.channel.name}")
+    # Привязываем view к старому/новому сообщению
+                if old_msg:
+                    await old_msg.edit(view=view)
+                else:
+                    setup_messages[before.channel.id] = new_msg
 
     if not after.channel or after.channel.name not in TRIGGER_CHANNELS:
         return
@@ -1041,10 +1050,11 @@ async def stat(ctx, member: discord.Member = None):
         level = stats["level"]
         exp = stats["exp"]
 
-        time_row = supabase.table("voice_time").select("total_seconds").eq("user_id", user_id).execute()
-        total_seconds = sum(r["total_seconds"] for r in time_row.data) if time_row.data else 0
-        total_hours = total_seconds / 3600
+        time_row = supabase.table("voice_time").select("total_seconds_all_time").eq("user_id", user_id).execute()
+        total_seconds_all_time = sum(r["total_seconds_all_time"] for r in time_row.data) if time_row.data else 0
+        total_hours = total_seconds_all_time / 3600
         avg_hours = total_hours / max(len(time_row.data), 1) if time_row.data else 0
+
 
         # Выбор фона по уровню
         if level <= 5:
