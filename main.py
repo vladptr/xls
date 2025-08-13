@@ -523,31 +523,7 @@ async def on_voice_state_update(member, before, after):
     user_id = member.id
     now = datetime.now(UTC).timestamp()
 
-    if after.channel and not before.channel:
-        if after.channel.id in BLACKLISTED_CHANNELS:
-            return
-
-        # Создаём временное сообщение для контекста
-        temp_msg = await after.channel.send("Загрузка статистики...")
-        ctx = await bot.get_context(temp_msg)
-
-        # Вызываем команду !stat
-        command = bot.get_command("stat")
-        # stat должна возвращать отправленное сообщение
-        stat_msg = await command.callback(ctx, member=member)
-        if stat_msg:
-            bot.voice_stat_messages[user_id] = stat_msg
-
-        await temp_msg.delete()
-
-    # Пользователь вышел из голосового канала
-    elif before.channel and not after.channel:
-        msg = bot.voice_stat_messages.pop(user_id, None)
-        if msg:
-            try:
-                await msg.delete()
-            except discord.NotFound:
-                pass
+   
     try:
         if after.channel and not before.channel:
             if after.channel.id in BLACKLISTED_CHANNELS:
