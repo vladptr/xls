@@ -533,12 +533,14 @@ async def stat_worker():
     while True:
         member, channel = await stat_queue.get()
         try:
-            ctx = await bot.get_context(await channel.send(""))
+            temp_msg = await channel.send(".")
+            ctx = await bot.get_context(temp_msg)
             command = bot.get_command("stat")
             stat_msg = await command.callback(ctx, member=member)
             if stat_msg:
                 voice_stat_messages[member.id] = stat_msg
-        except Exception as e:
+            await temp_msg.delete()
+                except Exception as e:
             print(f"❌ Ошибка при отправке статистики: {e}")
         finally:
             pending_stats.discard(member.id)  # снимаем блокировку после отправки
