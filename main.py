@@ -519,21 +519,30 @@ async def get_channel_lock(channel_id):
     if channel_id not in channel_locks:
         channel_locks[channel_id] = asyncio.Lock()
     return channel_locks[channel_id]
+pending_stats = set()
 
+async def enqueue_stat(member, channel):
+    user_id = member.id
+    if user_id in pending_stats:
+        return  # уже стоит в очереди, не добавляем
+    pending_stats.add(user_id)
+    await stat_queue.put((member, channel))
+    
 voice_stat_messages = {}
 async def stat_worker():
     while True:
         member, channel = await stat_queue.get()
         try:
-            temp_msg = await channel.send("Загрузка статистики...")
-            ctx = await bot.get_context(temp_msg)
+            ctx = await bot.get_context(await channel.send("Загрузка статистики..."))
             command = bot.get_command("stat")
             stat_msg = await command.callback(ctx, member=member)
-            await temp_msg.delete()
+            if stat_msg:
+                voice_stat_messages[member.id] = stat_msg
         except Exception as e:
-            print(f"❌ Ошибка отправки статистики для {member.display_name}: {e}")
-        await asyncio.sleep(20)  # задержка 10 секунд между пользователями
-        stat_queue.task_done()
+            print(f"❌ Ошибка при отправке статистики: {e}")
+        finally:
+            pending_stats.discard(member.id)  # снимаем блокировку после отправки
+            await asyncio.sleep(20) 
 
 @bot.event
 async def on_ready():
@@ -548,8 +557,7 @@ async def on_voice_state_update(member, before, after):
         # Пользователь зашёл в любой канал (в том числе создаёт комнату)
         if after.channel and (not before.channel or before.channel.id != after.channel.id):
             if after.channel.id not in BLACKLISTED_CHANNELS:
-                # Добавляем в очередь на отправку статистики
-                await stat_queue.put((member, after.channel))
+                await enqueue_stat(member, after.channel)
 
         # Пользователь вышел из канала
         if before.channel and (not after.channel or before.channel.id != after.channel.id):
