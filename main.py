@@ -533,7 +533,7 @@ async def stat_worker():
     while True:
         member, channel = await stat_queue.get()
         try:
-            ctx = await bot.get_context(await channel.send("Загрузка статистики..."))
+            ctx = await bot.get_context(await channel.send(""))
             command = bot.get_command("stat")
             stat_msg = await command.callback(ctx, member=member)
             if stat_msg:
@@ -542,7 +542,7 @@ async def stat_worker():
             print(f"❌ Ошибка при отправке статистики: {e}")
         finally:
             pending_stats.discard(member.id)  # снимаем блокировку после отправки
-            await asyncio.sleep(20) 
+            await asyncio.sleep(30) 
 
 @bot.event
 async def on_ready():
