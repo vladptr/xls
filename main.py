@@ -540,7 +540,7 @@ async def stat_worker():
             if stat_msg:
                 voice_stat_messages[member.id] = stat_msg
             await temp_msg.delete()
-                except Exception as e:
+        except Exception as e:
             print(f"❌ Ошибка при отправке статистики: {e}")
         finally:
             pending_stats.discard(member.id)  # снимаем блокировку после отправки
