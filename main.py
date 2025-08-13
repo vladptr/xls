@@ -36,6 +36,7 @@ room_modes = {}
 last_rename_times = {}
 created_channels = {}
 channel_bases = {}
+stat_queue = asyncio.Queue()
 
 PUBG_API_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJjZmMyNDMyMC01NzZlLTAxM2UtMjAyNS0yYTI4ZjY0MjU0ZDEiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzU0NzU4MTk5LCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InhsczIifQ.C74qapztROZBtCVEWdob2w4B0-omdLJ-aaBfdfFK91E"
 PUBG_PLATFORM = "steam"
@@ -518,30 +519,39 @@ async def get_channel_lock(channel_id):
     if channel_id not in channel_locks:
         channel_locks[channel_id] = asyncio.Lock()
     return channel_locks[channel_id]
-    
+
 voice_stat_messages = {}
+async def stat_worker():
+    while True:
+        member, channel = await stat_queue.get()
+        try:
+            temp_msg = await channel.send("Загрузка статистики...")
+            ctx = await bot.get_context(temp_msg)
+            command = bot.get_command("stat")
+            stat_msg = await command.callback(ctx, member=member)
+            await temp_msg.delete()
+        except Exception as e:
+            print(f"❌ Ошибка отправки статистики для {member.display_name}: {e}")
+        await asyncio.sleep(10)  # задержка 10 секунд между пользователями
+        stat_queue.task_done()
+
+@bot.event
+async def on_ready():
+    bot.loop.create_task(stat_worker())
+    print(f"Bot ready! Logged in as {bot.user}")
+
 @bot.event
 async def on_voice_state_update(member, before, after):
     user_id = member.id
     now = datetime.now(UTC).timestamp()
     try:
-        if after.channel and (not before.channel or before.channel.id != after.channel.id):
+        if after.channel and not before.channel:
             if after.channel.id in BLACKLISTED_CHANNELS:
                 return
-
-            # Отправляем статистику
-            temp_msg = await after.channel.send("Загрузка статистики...")
-            ctx = await bot.get_context(temp_msg)
-            command = bot.get_command("stat")
-            stat_msg = await command.callback(ctx, member=member)
-            if stat_msg:
-                voice_stat_messages[user_id] = stat_msg
-
-            await temp_msg.delete()
+            await stat_queue.put((member, after.channel))
 
         elif before.channel and not after.channel:
-            # Пользователь вышел — удаляем его статистику
-            msg = voice_stat_messages.pop(user_id, None)
+            msg = voice_stat_messages.pop(member.id, None)
             if msg:
                 try:
                     await msg.delete()
