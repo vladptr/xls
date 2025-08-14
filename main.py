@@ -564,14 +564,15 @@ async def on_voice_state_update(member, before, after):
     user_id = member.id
     now = datetime.now(UTC).timestamp()
     try:
-        # Пользователь зашёл в любой канал (в том числе создаёт комнату)
+        # Пользователь зашёл или перешёл в другой канал
         if after.channel and (not before.channel or before.channel.id != after.channel.id):
-    # Игнорируем блеклист и триггерные каналы создания комнат
+            # Игнорируем блеклист и триггерные каналы
             if after.channel.id not in BLACKLISTED_CHANNELS and after.channel.name not in TRIGGER_CHANNELS:
-                await enqueue_stat(member, after.channel)
+                # Проверка на дубликаты в очереди
+                if user_id not in pending_stats:
+                    await enqueue_stat(member, after.channel)
 
-
-        # Пользователь вышел из канала
+        # Пользователь вышел из канала или перешёл в другой
         if before.channel and (not after.channel or before.channel.id != after.channel.id):
             # Удаляем сообщение, если уже отправлено
             msg = voice_stat_messages.pop(user_id, None)
