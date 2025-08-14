@@ -580,6 +580,9 @@ async def on_voice_state_update(member, before, after):
                 if user_id not in pending_stats:
                     await enqueue_stat(member, after.channel)
         
+    except Exception as e:
+        print(f"❌ Ошибка при обновлении статистики: {e}")
+        
     try:
         if after.channel and not before.channel:
             if after.channel.id in BLACKLISTED_CHANNELS:
