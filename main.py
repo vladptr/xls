@@ -1413,59 +1413,6 @@ async def generatestat(ctx):
         await ctx.send(f"❌ Ошибка при сбросе статистики: {e}")
         print(f"❌ Ошибка в команде generatestat: {e}")
 
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-@bot.event
-async def on_message(message):
-    if message.author == bot.user:
-        return
-
-    # Проверка, что бота тегнули
-    if bot.user in message.mentions:
-        user_input = message.content.replace(f"<@{bot.user.id}>", "").strip()
-
-        if not user_input:
-            await message.channel.send(random.choice([
-                "Че ты пингуешь, долбоеб?",
-                "А? Сука, ты ахуел?",
-                "Ты мне жизнь хочешь испортить? Иди нахуй."
-            ]))
-            return
-
-        try:
-            # 30% шанс, что бот просто пошлёт нахуй, а не будет генерить ответ
-            if random.random() < 0.1:
-                await message.channel.send(random.choice([
-                    "слышь, нахуй иди.",
-                    "отъебись школяр ебаный",
-                    "у тебя мать в доте саппортом была?"
-                ]))
-                return
-
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": (
-                        "Ты токсичный Discord-бот. "
-                        "Отвечаешь как 15-летний школьник с 10к часов в доте. "
-                        "Ты грубый, материшься, шутишь черным юмором, доебываешься до людей. "
-                        "Можешь послать нахуй без причины, можешь обозвать, можешь троллить. "
-                        "Главное — никакой вежливости, только токсичный стиль."
-                    )},
-                    {"role": "user", "content": user_input}
-                ]
-            )
-
-            reply = response.choices[0].message.content
-            await message.channel.send(reply)
-
-        except Exception as e:
-            await message.channel.send(f"❌ Ошибка при генерации ответа: {e}")
-
-    await bot.process_commands(message)
-
-
 token = os.getenv("TOKEN")
 
 
