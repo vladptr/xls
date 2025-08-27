@@ -1414,7 +1414,7 @@ async def generatestat(ctx):
         print(f"❌ Ошибка в команде generatestat: {e}")
 
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))#"#
 
 @bot.event
 async def on_message(message):
