@@ -16,3 +16,4 @@ google-auth-oauthlib
 twitchAPI
 aiohttp
 beautifulsoup4
+openai
