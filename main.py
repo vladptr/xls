@@ -1430,8 +1430,8 @@ async def on_message(message):
             return
 
         try:
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",  # можно gpt-4
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",  # лучше gpt-4o-mini или gpt-3.5-turbo
                 messages=[
                     {"role": "system", "content": (
                         "Ты грубый Discord-бот, ведёшь себя как злой гопник. "
@@ -1442,7 +1442,7 @@ async def on_message(message):
                 ]
             )
 
-            reply = response["choices"][0]["message"]["content"]
+            reply = response.choices[0].message.content
             await message.channel.send(reply)
 
         except Exception as e:
