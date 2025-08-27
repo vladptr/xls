@@ -1414,29 +1414,44 @@ async def generatestat(ctx):
         print(f"❌ Ошибка в команде generatestat: {e}")
 
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))#"#
+client = "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"#OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
         return
 
-    # Проверка, что бота упомянули
+    # Проверка, что бота тегнули
     if bot.user in message.mentions:
         user_input = message.content.replace(f"<@{bot.user.id}>", "").strip()
 
         if not user_input:
-            await message.channel.send("Че надо блять нахуй?")
+            await message.channel.send(random.choice([
+                "Че ты пингуешь, долбоеб?",
+                "А? Сука, ты ахуел?",
+                "Ты мне жизнь хочешь испортить? Иди нахуй."
+            ]))
             return
 
         try:
+            # 30% шанс, что бот просто пошлёт нахуй, а не будет генерить ответ
+            if random.random() < 0.1:
+                await message.channel.send(random.choice([
+                    "слышь, нахуй иди.",
+                    "отъебись школяр ебаный",
+                    "у тебя мать в доте саппортом была?"
+                ]))
+                return
+
             response = client.chat.completions.create(
-                model="gpt-4o-mini",  # лучше gpt-4o-mini или gpt-3.5-turbo
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": (
-                        "Ты грубый Discord-бот, ведёшь себя как злой гопник. "
-                        "Отвечай резко и с матами, можешь послать нахуй, если тебя достают. "
-                        "Не будь вежливым, веди себя по-хулигански."
+                        "Ты токсичный Discord-бот. "
+                        "Отвечаешь как 15-летний школьник с 10к часов в доте. "
+                        "Ты грубый, материшься, шутишь черным юмором, доебываешься до людей. "
+                        "Можешь послать нахуй без причины, можешь обозвать, можешь троллить. "
+                        "Главное — никакой вежливости, только токсичный стиль."
                     )},
                     {"role": "user", "content": user_input}
                 ]
