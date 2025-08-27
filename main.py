@@ -29,7 +29,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 from io import BytesIO
 import requests
 import re
-import openai
+from openai import OpenAI
 
 setup_messages = {}
 channel_locks = {}
