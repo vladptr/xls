@@ -28,6 +28,7 @@ from datetime import datetime, UTC
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from io import BytesIO
 import requests
+import re
 
 
 setup_messages = {}
@@ -1025,8 +1026,9 @@ async def stat(ctx, member: discord.Member = None):
     try:
         member = member or ctx.author
         user_id = member.id
-
-        pubg_name = member.display_name.split(" ")[0].strip()
+        
+        raw_name = member.display_name
+        pubg_name = re.split(r"[ \(\{\[]", raw_name, 1)[0].strip()
         print(f"PUBG поиск ника: {pubg_name}")
 
         headers = {
