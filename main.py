@@ -29,7 +29,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 from io import BytesIO
 import requests
 import re
-
+import openai
 
 setup_messages = {}
 channel_locks = {}
@@ -1413,6 +1413,42 @@ async def generatestat(ctx):
         await ctx.send(f"❌ Ошибка при сбросе статистики: {e}")
         print(f"❌ Ошибка в команде generatestat: {e}")
 
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+@bot.event
+async def on_message(message):
+    if message.author == bot.user:
+        return
+
+    # Проверка, что бота упомянули
+    if bot.user in message.mentions:
+        user_input = message.content.replace(f"<@{bot.user.id}>", "").strip()
+
+        if not user_input:
+            await message.channel.send("Да, слушаю, что тебе надо?")
+            return
+
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",  # можно gpt-4
+                messages=[
+                    {"role": "system", "content": (
+                        "Ты грубый Discord-бот, ведёшь себя как злой гопник. "
+                        "Отвечай резко и с матами, можешь послать нахуй, если тебя достают. "
+                        "Не будь вежливым, веди себя по-хулигански."
+                    )},
+                    {"role": "user", "content": user_input}
+                ]
+            )
+
+            reply = response["choices"][0]["message"]["content"]
+            await message.channel.send(reply)
+
+        except Exception as e:
+            await message.channel.send(f"❌ Ошибка при генерации ответа: {e}")
+
+    await bot.process_commands(message)
 
 
 token = os.getenv("TOKEN")
