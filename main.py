@@ -1414,7 +1414,7 @@ async def generatestat(ctx):
         print(f"❌ Ошибка в команде generatestat: {e}")
 
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @bot.event
 async def on_message(message):
@@ -1426,7 +1426,7 @@ async def on_message(message):
         user_input = message.content.replace(f"<@{bot.user.id}>", "").strip()
 
         if not user_input:
-            await message.channel.send("Да, слушаю, что тебе надо?")
+            await message.channel.send("Че надо блять нахуй?")
             return
 
         try:
