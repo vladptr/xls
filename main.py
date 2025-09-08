@@ -24,7 +24,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from webserver import keep_alive
-from datetime import datetime, UTC
+from datetime import datetime, timezone, timedelta
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from io import BytesIO
 import requests
@@ -563,7 +563,7 @@ async def on_ready():
 @bot.event
 async def on_voice_state_update(member, before, after):
     user_id = member.id
-    now = datetime.now(UTC).timestamp()
+    now = datetime.now(timezone.utc).timestamp()
     try:
         # --- Выход или переход: удаляем старую карточку ---
         if before.channel and (not after.channel or before.channel.id != after.channel.id):
@@ -888,7 +888,7 @@ async def getgraph(ctx, cycle_number: int = None):
 
 async def weekly_reset():
     while True:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         days_until_wednesday = (2 - now.weekday() + 7) % 7
         if days_until_wednesday == 0:
             days_until_wednesday = 7
