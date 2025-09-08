@@ -55,15 +55,15 @@ intents.message_content = True
 
 
 
-service_account_info = json.loads(os.environ["GOOGLE_CREDS_JSON"])
+#service_account_info = json.loads(os.environ["GOOGLE_CREDS_JSON"])
 
-credentials = service_account.Credentials.from_service_account_info(
-    service_account_info,
-    scopes=[
-        "https://www.googleapis.com/auth/drive",  # или другие нужные тебе
-    ]
-)
-drive_service = build('drive', 'v3', credentials=credentials)
+#credentials = service_account.Credentials.from_service_account_info(
+ #   service_account_info,
+  #  scopes=[
+   #     "https://www.googleapis.com/auth/drive",  # или другие нужные тебе
+    #]
+#)
+#drive_service = build('drive', 'v3', credentials=credentials)
 
 BLACKLISTED_CHANNELS = {
     1187507350156886096,
@@ -729,19 +729,19 @@ async def on_voice_state_update(member, before, after):
 
 
 #/////////////////////////////////////////////////////
-async def upload_to_google_drive(file_path, folder_id=None):
-    file_metadata = {'name': file_path.split('/')[-1]}
-    if folder_id:
-        file_metadata['parents'] = [folder_id]
+#async def upload_to_google_drive(file_path, folder_id=None):
+ #   file_metadata = {'name': file_path.split('/')[-1]}
+  #  if folder_id:
+   #     file_metadata['parents'] = [folder_id]
 
-    media = MediaFileUpload(file_path, mimetype='image/png')
-    file = drive_service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields='id, webViewLink'
-    ).execute()
-    print(f"Файл {file_path} загружен в Google Drive. Ссылка: {file['webViewLink']}")
-    return file['id'], file['webViewLink']
+    #media = MediaFileUpload(file_path, mimetype='image/png')
+    #file = drive_service.files().create(
+    #    body=file_metadata,
+    #    media_body=media,
+    #    fields='id, webViewLink'
+    #).execute()
+    #print(f"Файл {file_path} загружен в Google Drive. Ссылка: {file['webViewLink']}")
+    #return file['id'], file['webViewLink']
 
 
 
