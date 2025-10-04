@@ -1116,12 +1116,26 @@ async def stat(ctx, member: discord.Member = None):
         level = stats["level"]
         exp = stats["exp"]
 
-        time_row = supabase.table("voice_time").select("total_seconds_all_time").eq("user_id", user_id).execute()
-        total_seconds_all_time = sum(r["total_seconds_all_time"] for r in time_row.data) if time_row.data else 0
-        total_hours = total_seconds_all_time / 3600
-        avg_hours = total_hours / max(len(time_row.data), 1) if time_row.data else 0
+        time_row = supabase.table("voice_time").select("total_seconds_all_time").eq("user_id", user_id).limit(1).execute()
+        if time_row.data and time_row.data[0].get("total_seconds_all_time") is not None:
+            total_seconds_all_time = int(time_row.data[0].get("total_seconds_all_time", 0))
+        else:
+            total_seconds_all_time = 0
 
+        total_hours = total_seconds_all_time / 3600.0
 
+        weeks_rows = supabase.table("weekly_voice_stats").select("cycle_number,week_number").eq("user_id", user_id).execute()
+        if weeks_rows.data:
+            weeks_set = {(r.get("cycle_number"), r.get("week_number")) for r in weeks_rows.data}
+            weeks_count = len(weeks_set)
+        else:
+            weeks_count = 0
+
+        if weeks_count <= 0:
+            avg_hours = 0.0
+        else:
+            avg_hours = total_hours / weeks_count
+         
         # Выбор фона по уровню
         if level <= 5:
             background_path = "1-5.png"
