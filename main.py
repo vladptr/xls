@@ -495,7 +495,7 @@ class PlayerCountSelect(Select):
             await interaction.response.send_message("Голосовой канал не найден!", ephemeral=True)
             return
 
-        text_channel = discord.utils.get(guild.text_channels, name="🔍・поиск-тимы")
+        text_channel = discord.utils.get(guild.text_channels, name="💬・chat")
         if not text_channel:
             await interaction.response.send_message("Текстовый канал 'поиск' не найден!", ephemeral=True)
             return
