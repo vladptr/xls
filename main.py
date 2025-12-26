@@ -710,7 +710,8 @@ async def on_voice_state_update(member, before, after):
             number += 1
             new_name = f"{base_name} #{number}"
 
-        new_channel = await guild.create_voice_channel(new_name, category=category)
+        new_channel = await guild.create_voice_channel(new_name,category=category,rtc_region="rotterdam")
+
         await member.move_to(new_channel)
         await enqueue_stat(member, new_channel)
         
@@ -1432,6 +1433,7 @@ async def generatestat(ctx):
 token = os.getenv("TOKEN")
 
 
+await bot.load_extension("check")
 
 async def main():
     keep_alive()
