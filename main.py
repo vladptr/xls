@@ -1433,7 +1433,7 @@ async def generatestat(ctx):
 token = os.getenv("TOKEN")
 
 
-await bot.load_extension("check")
+bot.load_extension("check")
 
 async def main():
     keep_alive()
