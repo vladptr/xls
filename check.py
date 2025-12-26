@@ -9,10 +9,10 @@ headers = {
     "Accept": "application/vnd.api+json"
 }
 
-def setup(bot: commands.Bot):
-
+async def setup(bot: commands.Bot):
     @bot.command(name="check")
     async def check(ctx, nickname: str):
+        
         try:
             url_player = (
                 f"https://api.pubg.com/shards/{PUBG_PLATFORM}"
