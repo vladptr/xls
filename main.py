@@ -1433,12 +1433,13 @@ async def generatestat(ctx):
 token = os.getenv("TOKEN")
 
 
-bot.load_extension("check")
+
 
 async def main():
     keep_alive()
     asyncio.create_task(weekly_reset())
     await bot.start(token)
+    await bot.load_extension("check")
 
 asyncio.run(main())
 #await bot.start("")
