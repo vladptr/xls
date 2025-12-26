@@ -10,18 +10,22 @@ headers = {
 }
 
 async def setup(bot: commands.Bot):
+
     @bot.command(name="check")
-    async def check(ctx, nickname: str):
-        
+    async def check(ctx, *, nickname: str):
+        print("CHECK COMMAND CALLED:", nickname)
+
         try:
-            url_player = (
+            url = (
                 f"https://api.pubg.com/shards/{PUBG_PLATFORM}"
                 f"/players?filter[playerNames]={nickname}"
             )
-            resp = requests.get(url_player, headers=headers)
+
+            resp = requests.get(url, headers=headers)
+            print("STATUS:", resp.status_code)
 
             if resp.status_code != 200:
-                await ctx.send("❌ Ошибка запроса к PUBG API")
+                await ctx.send("❌ PUBG API error")
                 return
 
             data = resp.json().get("data", [])
@@ -29,24 +33,13 @@ async def setup(bot: commands.Bot):
                 await ctx.send("❌ Игрок не найден")
                 return
 
-            player = data[0]
-            player_id = player["id"]
+            clan = data[0].get("relationships", {}).get("clan", {}).get("data")
 
-            relationships = player.get("relationships", {})
-            clan_data = relationships.get("clan", {}).get("data")
-
-            if clan_data:
-                clan_id = clan_data["id"]
-                await ctx.send(
-                    f"👤 **{nickname}**\n"
-                    f"🏷️ Clan ID: `{clan_id}`"
-                )
+            if clan:
+                await ctx.send(f"👤 **{nickname}**\n🏷️ Clan ID: `{clan['id']}`")
             else:
-                await ctx.send(
-                    f"👤 **{nickname}**\n"
-                    f"❌ Игрок не состоит в клане"
-                )
+                await ctx.send(f"👤 **{nickname}**\n❌ Не в клане")
 
         except Exception as e:
-            await ctx.send("❌ Ошибка при выполнении команды")
             print("CHECK ERROR:", e)
+            await ctx.send("❌ Ошибка")
