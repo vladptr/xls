@@ -13,39 +13,52 @@ async def setup(bot: commands.Bot):
 
     @bot.command(name="check")
     async def check(ctx, *, nickname: str):
-        url = (
-            f"https://api.pubg.com/shards/{PUBG_PLATFORM}"
-            f"/players?filter[playerNames]={nickname}"
-        )
+        try:
+            # 1️⃣ Получаем игрока
+            url_player = (
+                f"https://api.pubg.com/shards/{PUBG_PLATFORM}"
+                f"/players?filter[playerNames]={nickname}"
+            )
+            r_player = requests.get(url_player, headers=HEADERS)
 
-        async with aiohttp.ClientSession(headers=HEADERS) as session:
-            async with session.get(url) as resp:
+            if r_player.status_code != 200:
+                await ctx.send("❌ Ошибка запроса к PUBG API")
+                return
 
-                if resp.status != 200:
-                    await ctx.send("❌ Ошибка запроса к PUBG API")
-                    return
+            players = r_player.json().get("data", [])
+            if not players:
+                await ctx.send("❌ Игрок не найден")
+                return
 
-                data = (await resp.json()).get("data", [])
+            player_id = players[0]["id"]
 
-                if not data:
-                    await ctx.send("❌ Игрок не найден")
-                    return
+            # 2️⃣ Получаем клан по player_id
+            url_clan = (
+                f"https://api.pubg.com/shards/{PUBG_PLATFORM}"
+                f"/clans?filter[playerIds]={player_id}"
+            )
+            r_clan = requests.get(url_clan, headers=HEADERS)
 
-                player = data[0]
-                clan = (
-                    player
-                    .get("relationships", {})
-                    .get("clan", {})
-                    .get("data")
+            clans = r_clan.json().get("data", [])
+
+            if not clans:
+                await ctx.send(
+                    f"👤 **{nickname}**\n"
+                    f"❌ Игрок не состоит в клане"
                 )
+                return
 
-                if clan:
-                    await ctx.send(
-                        f"👤 **{nickname}**\n"
-                        f"🏷️ Clan ID: `{clan['id']}`"
-                    )
-                else:
-                    await ctx.send(
-                        f"👤 **{nickname}**\n"
-                        f"❌ Игрок не состоит в клане"
-                    )
+            clan = clans[0]
+            clan_id = clan["id"]
+            clan_name = clan["attributes"]["name"]
+            clan_tag = clan["attributes"].get("tag", "—")
+
+            await ctx.send(
+                f"👤 **{nickname}**\n"
+                f"🏷️ Clan: **{clan_name}** [{clan_tag}]\n"
+                f"🆔 Clan ID: `{clan_id}`"
+            )
+
+        except Exception as e:
+            print("CHECK ERROR:", e)
+            await ctx.send("❌ Ошибка при выполнении команды")
