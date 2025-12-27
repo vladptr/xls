@@ -1438,8 +1438,9 @@ token = os.getenv("TOKEN")
 async def main():
     keep_alive()
     asyncio.create_task(weekly_reset())
-    await bot.start(token)
     await bot.load_extension("check")
+    await bot.start(token)
+    
 
 asyncio.run(main())
 #await bot.start("")
