@@ -1,6 +1,7 @@
 import discord
 from discord.ui import View, Button, Modal, TextInput
 import requests
+import asyncio
 from modules.config import PUBG_API_KEY, PUBG_PLATFORM, bot
 from modules.database import supabase
 
@@ -397,7 +398,9 @@ async def check_all_members_in_clan(guild: discord.Guild):
         checked_count = 0
         removed_count = 0
         
-        for registration in registrations.data:
+        total_registrations = len(registrations.data)
+        
+        for index, registration in enumerate(registrations.data):
             discord_id = registration.get("discord_id")
             player_id = registration.get("player_id")
             pubg_nickname = registration.get("pubg_nickname", "")
@@ -464,6 +467,11 @@ async def check_all_members_in_clan(guild: discord.Guild):
                         }).eq("discord_id", discord_id).execute()
                         removed_count += 1
                         print(f"❌ Удалена роль у пользователя {member.display_name} ({current_nickname}) - игрок не найден в клане")
+                
+                # Добавляем задержку в 1 минуту между проверками участников (кроме последнего)
+                if index < total_registrations - 1:
+                    print(f"⏳ Ожидание 1 минуту перед проверкой следующего участника...")
+                    await asyncio.sleep(60)  # 1 минута = 60 секунд
                 
             except Exception as e:
                 print(f"❌ Ошибка при проверке пользователя {discord_id}: {e}")
