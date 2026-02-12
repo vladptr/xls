@@ -2,7 +2,7 @@ import discord
 import asyncio
 import random
 from datetime import datetime, timezone, timedelta
-from modules.config import bot, BLACKLISTED_CHANNELS, TRIGGER_CHANNELS
+from modules.config import bot, BLACKLISTED_CHANNELS, TRIGGER_CHANNELS, MAIN_GUILD_ID
 from modules.database import supabase
 from modules.voice_channels import (
     setup_messages, channel_locks, room_modes, created_channels, 
@@ -346,11 +346,11 @@ async def clan_verification_check():
         await asyncio.sleep(10800)  # 3 часа = 10800 секунд
         
         try:
-            # Получаем первую гильдию бота (можно улучшить для нескольких серверов)
+            # Получаем основную гильдию по ID (если бот на нескольких серверах)
             guilds = bot.guilds
             if guilds:
-                guild = guilds[0]  # Берем первый сервер
-                print("🔄 Запуск проверки участников клана...")
+                guild = discord.utils.get(guilds, id=MAIN_GUILD_ID) or guilds[0]
+                print(f"🔄 Запуск проверки участников клана на сервере {guild.id}...")
                 await check_all_members_in_clan(guild)
             else:
                 print("⚠️ Бот не подключен ни к одному серверу")
@@ -365,7 +365,6 @@ async def weekly_reset():
             days_until_wednesday = 7
         next_reset_date = (now + timedelta(days=days_until_wednesday)).date()
         next_reset = datetime.combine(next_reset_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-        
         wait_time = (next_reset - now).total_seconds()
         print(f"⏳ Ожидание до следующей среды: {wait_time // 3600:.0f}ч {(wait_time % 3600) // 60:.0f}м")
         await asyncio.sleep(wait_time)
@@ -425,5 +424,4 @@ async def weekly_reset():
 
         except Exception as e:
             print(f"❌ Ошибка при сбросе статистики: {e}")
-
 
