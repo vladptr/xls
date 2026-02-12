@@ -10,7 +10,7 @@ def get_connection():
     
     print("🔐 URL:", url)
     if key:
-        print("🔐 KEY:", key[:10], "...")
+        print("🔐 KEY:", key[:10] if len(key) > 10 else key, "...")
 
     return create_client(url, key)
 
@@ -34,4 +34,5 @@ def init_db():
     except Exception as e:
         print(f"❌ Ошибка при инициализации базы данных: {e}")
         raise
+
 
