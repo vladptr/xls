@@ -74,75 +74,116 @@ class RegistrationModal(Modal):
             return
         
         # Проверяем, не привязан ли уже этот player_id к другому Discord аккаунту
-        existing_user = supabase.table("user_registrations").select("*").eq("player_id", player_id).execute()
-        if existing_user.data:
-            existing_discord_id = existing_user.data[0].get("discord_id")
-            if str(existing_discord_id) != str(interaction.user.id):
-                existing_nickname = existing_user.data[0].get("pubg_nickname", nickname)
-                await interaction.followup.send(
-                    f"❌ Игрок с ником '{existing_nickname}' (player_id: {player_id}) уже привязан к другому аккаунту Discord!", 
-                    ephemeral=True
-                )
-                return
+        print(f"🔍 Проверка существующих привязок для player_id: {player_id}")
+        try:
+            existing_user = supabase.table("user_registrations").select("*").eq("player_id", player_id).execute()
+            print(f"📊 Результат проверки: {len(existing_user.data) if existing_user.data else 0} записей найдено")
+            if existing_user.data:
+                existing_discord_id = existing_user.data[0].get("discord_id")
+                print(f"🔍 Существующий discord_id: {existing_discord_id}, текущий: {interaction.user.id}")
+                if str(existing_discord_id) != str(interaction.user.id):
+                    existing_nickname = existing_user.data[0].get("pubg_nickname", nickname)
+                    print(f"❌ Конфликт привязки: игрок уже привязан к другому аккаунту")
+                    await interaction.followup.send(
+                        f"❌ Игрок с ником '{existing_nickname}' (player_id: {player_id}) уже привязан к другому аккаунту Discord!", 
+                        ephemeral=True
+                    )
+                    return
+        except Exception as e:
+            print(f"❌ Ошибка при проверке существующих привязок: {e}")
+            import traceback
+            traceback.print_exc()
+            await interaction.followup.send(
+                f"❌ Ошибка при проверке данных. Попробуйте позже.",
+                ephemeral=True
+            )
+            return
         
+        print(f"🔍 Проверка клана: is_in_clan = {is_in_clan}, player_id = {player_id}")
         if is_in_clan:
             # Игрок в клане - привязываем player_id к discord_id
             actual_nickname = current_nickname if current_nickname else nickname
             print(f"✅ Игрок {actual_nickname} найден в клане для пользователя {interaction.user.id}")
             
-            # Выдаем роль
-            role = interaction.guild.get_role(CLAN_ROLE_ID)
-            if role:
-                try:
-                    await interaction.user.add_roles(role)
-                    print(f"✅ Роль выдана пользователю {interaction.user.id}")
-                except Exception as e:
-                    print(f"❌ Ошибка при выдаче роли пользователю {interaction.user.id}: {e}")
+            try:
+                # Выдаем роль
+                role = interaction.guild.get_role(CLAN_ROLE_ID)
+                print(f"🔍 Поиск роли с ID {CLAN_ROLE_ID}: {role}")
+                if role:
+                    try:
+                        await interaction.user.add_roles(role)
+                        print(f"✅ Роль выдана пользователю {interaction.user.id}")
+                    except Exception as e:
+                        print(f"❌ Ошибка при выдаче роли пользователю {interaction.user.id}: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        await interaction.followup.send(
+                            f"❌ Ошибка при выдаче роли: {e}", 
+                            ephemeral=True
+                        )
+                        return
+                else:
+                    print(f"⚠️ Роль с ID {CLAN_ROLE_ID} не найдена на сервере!")
                     await interaction.followup.send(
-                        f"❌ Ошибка при выдаче роли: {e}", 
+                        f"⚠️ Роль клана не найдена на сервере. Обратитесь к администратору.",
                         ephemeral=True
                     )
                     return
-            
-            # Меняем никнейм пользователя на формат "ник (имя)"
-            new_nickname = f"{actual_nickname} ({name})"
-            try:
-                await interaction.user.edit(nick=new_nickname)
-                print(f"✅ Никнейм изменен для пользователя {interaction.user.id}: {new_nickname}")
-            except discord.Forbidden:
-                print(f"⚠️ Нет прав на изменение никнейма для пользователя {interaction.user.id}")
-                await interaction.followup.send(
-                    f"⚠️ Не удалось изменить никнейм (нет прав). Пожалуйста, измените его вручную на: {new_nickname}",
-                    ephemeral=True
-                )
-            except Exception as e:
-                print(f"❌ Ошибка при изменении никнейма для пользователя {interaction.user.id}: {e}")
-            
-            # Сохраняем данные в базу - привязываем player_id к discord_id
-            try:
-                supabase.table("user_registrations").upsert({
-                    "discord_id": interaction.user.id,
-                    "player_id": player_id,
-                    "pubg_nickname": actual_nickname,
-                    "name": name,
-                    "pubg_plus": pubg_plus == "да",
-                    "verified": True
-                }).execute()
                 
-                print(f"✅ Данные сохранены в базу для пользователя {interaction.user.id}")
+                # Меняем никнейм пользователя на формат "ник (имя)"
+                new_nickname = f"{actual_nickname} ({name})"
+                print(f"🔍 Попытка изменить никнейм на: {new_nickname}")
+                try:
+                    await interaction.user.edit(nick=new_nickname)
+                    print(f"✅ Никнейм изменен для пользователя {interaction.user.id}: {new_nickname}")
+                except discord.Forbidden:
+                    print(f"⚠️ Нет прав на изменение никнейма для пользователя {interaction.user.id}")
+                    # Не возвращаемся, продолжаем сохранение данных
+                except Exception as e:
+                    print(f"❌ Ошибка при изменении никнейма для пользователя {interaction.user.id}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    # Не возвращаемся, продолжаем сохранение данных
                 
-                await interaction.followup.send(
-                    f"✅ Регистрация успешна! Игрок привязан к вашему аккаунту. Вам выдана роль клана. Никнейм изменен на: **{new_nickname}**. Добро пожаловать, {name}!",
-                    ephemeral=True
-                )
+                # Сохраняем данные в базу - привязываем player_id к discord_id
+                print(f"💾 Сохранение данных в базу для пользователя {interaction.user.id}")
+                try:
+                    result = supabase.table("user_registrations").upsert({
+                        "discord_id": str(interaction.user.id),
+                        "player_id": player_id,
+                        "pubg_nickname": actual_nickname,
+                        "name": name,
+                        "pubg_plus": pubg_plus == "да",
+                        "verified": True
+                    }).execute()
+                    
+                    print(f"✅ Данные сохранены в базу для пользователя {interaction.user.id}")
+                    print(f"📊 Результат сохранения: {result.data if hasattr(result, 'data') else 'OK'}")
+                    
+                    await interaction.followup.send(
+                        f"✅ Регистрация успешна! Игрок привязан к вашему аккаунту. Вам выдана роль клана. Никнейм изменен на: **{new_nickname}**. Добро пожаловать, {name}!",
+                        ephemeral=True
+                    )
+                    print(f"✅ Сообщение об успехе отправлено пользователю {interaction.user.id}")
+                except Exception as e:
+                    print(f"❌ Ошибка при сохранении данных для пользователя {interaction.user.id}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    await interaction.followup.send(
+                        f"❌ Ошибка при сохранении данных: {e}",
+                        ephemeral=True
+                    )
             except Exception as e:
-                print(f"❌ Ошибка при сохранении данных для пользователя {interaction.user.id}: {e}")
+                print(f"❌ Критическая ошибка в блоке регистрации для пользователя {interaction.user.id}: {e}")
                 import traceback
                 traceback.print_exc()
-                await interaction.followup.send(
-                    f"❌ Ошибка при сохранении данных: {e}",
-                    ephemeral=True
-                )
+                try:
+                    await interaction.followup.send(
+                        f"❌ Произошла ошибка при регистрации. Попробуйте позже или обратитесь к администратору.",
+                        ephemeral=True
+                    )
+                except:
+                    pass
         else:
             # Игрок НЕ в клане - НЕ привязываем player_id, НЕ меняем никнейм
             print(f"❌ Игрок '{nickname}' не состоит в клане для пользователя {interaction.user.id}")
