@@ -52,10 +52,21 @@ class RegistrationModal(Modal):
         
         await interaction.response.defer(ephemeral=True)
         
+        print(f"📝 Начало регистрации для пользователя {interaction.user.id} с ником '{nickname}'")
+        
         # Получаем информацию об игроке по нику (player_id, актуальный ник, статус в клане)
-        player_id, current_nickname, is_in_clan = await get_player_info(nickname)
+        try:
+            player_id, current_nickname, is_in_clan = await get_player_info(nickname)
+        except Exception as e:
+            print(f"❌ Критическая ошибка при получении информации об игроке: {e}")
+            await interaction.followup.send(
+                f"❌ Произошла ошибка при проверке игрока. Попробуйте позже или обратитесь к администратору.",
+                ephemeral=True
+            )
+            return
         
         if not player_id:
+            print(f"⚠️ Игрок '{nickname}' не найден для пользователя {interaction.user.id}")
             await interaction.followup.send(
                 f"❌ Игрок с ником '{nickname}' не найден в PUBG. Проверьте правильность написания ника.",
                 ephemeral=True
@@ -77,13 +88,16 @@ class RegistrationModal(Modal):
         if is_in_clan:
             # Игрок в клане - привязываем player_id к discord_id
             actual_nickname = current_nickname if current_nickname else nickname
+            print(f"✅ Игрок {actual_nickname} найден в клане для пользователя {interaction.user.id}")
             
             # Выдаем роль
             role = interaction.guild.get_role(CLAN_ROLE_ID)
             if role:
                 try:
                     await interaction.user.add_roles(role)
+                    print(f"✅ Роль выдана пользователю {interaction.user.id}")
                 except Exception as e:
+                    print(f"❌ Ошибка при выдаче роли пользователю {interaction.user.id}: {e}")
                     await interaction.followup.send(
                         f"❌ Ошибка при выдаче роли: {e}", 
                         ephemeral=True
@@ -94,13 +108,15 @@ class RegistrationModal(Modal):
             new_nickname = f"{actual_nickname} ({name})"
             try:
                 await interaction.user.edit(nick=new_nickname)
+                print(f"✅ Никнейм изменен для пользователя {interaction.user.id}: {new_nickname}")
             except discord.Forbidden:
+                print(f"⚠️ Нет прав на изменение никнейма для пользователя {interaction.user.id}")
                 await interaction.followup.send(
                     f"⚠️ Не удалось изменить никнейм (нет прав). Пожалуйста, измените его вручную на: {new_nickname}",
                     ephemeral=True
                 )
             except Exception as e:
-                print(f"❌ Ошибка при изменении никнейма: {e}")
+                print(f"❌ Ошибка при изменении никнейма для пользователя {interaction.user.id}: {e}")
             
             # Сохраняем данные в базу - привязываем player_id к discord_id
             try:
@@ -113,17 +129,23 @@ class RegistrationModal(Modal):
                     "verified": True
                 }).execute()
                 
+                print(f"✅ Данные сохранены в базу для пользователя {interaction.user.id}")
+                
                 await interaction.followup.send(
-                    f"✅ Регистрация успешна! Игрок привязан к вашему аккаунту. Вам выдана роль клана. Никнейм изменен на: {new_nickname}. Добро пожаловать, {name}!",
+                    f"✅ Регистрация успешна! Игрок привязан к вашему аккаунту. Вам выдана роль клана. Никнейм изменен на: **{new_nickname}**. Добро пожаловать, {name}!",
                     ephemeral=True
                 )
             except Exception as e:
+                print(f"❌ Ошибка при сохранении данных для пользователя {interaction.user.id}: {e}")
+                import traceback
+                traceback.print_exc()
                 await interaction.followup.send(
                     f"❌ Ошибка при сохранении данных: {e}",
                     ephemeral=True
                 )
         else:
             # Игрок НЕ в клане - НЕ привязываем player_id, НЕ меняем никнейм
+            print(f"❌ Игрок '{nickname}' не состоит в клане для пользователя {interaction.user.id}")
             await interaction.followup.send(
                 f"❌ Игрок с ником '{nickname}' не состоит в клане. Привязка не выполнена. Если вы только что вступили в клан, подождите несколько минут и попробуйте снова.",
                 ephemeral=True
@@ -166,34 +188,45 @@ async def get_player_info(nickname: str):
         }
         
         # Получаем player_id по нику
-        url_player = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players?filter[playerNames]={nickname}"
+        # URL-кодируем ник для безопасности
+        import urllib.parse
+        encoded_nickname = urllib.parse.quote(nickname)
+        url_player = f"https://api.pubg.com/shards/{PUBG_PLATFORM}/players?filter[playerNames]={encoded_nickname}"
+        print(f"🔍 Поиск игрока: {nickname} (URL: {url_player})")
         resp_player = requests.get(url_player, headers=headers, timeout=10)
         
         if resp_player.status_code != 200:
-            print(f"❌ Ошибка при получении данных игрока: {resp_player.status_code}")
+            error_text = resp_player.text[:200] if resp_player.text else "Нет текста ошибки"
+            print(f"❌ Ошибка при получении данных игрока {nickname}: статус {resp_player.status_code}, ответ: {error_text}")
             return None, None, False
         
         player_data = resp_player.json()
         
         if "data" not in player_data or not player_data["data"]:
+            print(f"⚠️ Игрок {nickname} не найден в ответе API")
             return None, None, False
         
         player_info = player_data["data"][0]
         player_id = player_info["id"]
         attributes = player_info.get("attributes", {})
         current_nickname = attributes.get("name", nickname)
-        
-        # Проверяем clanId прямо из attributes
         clan_id = attributes.get("clanId")
         is_in_clan = clan_id == CLAN_ID if clan_id else False
+        
+        print(f"✅ Найден игрок: {current_nickname} (ID: {player_id}), клан: {clan_id}, в целевом клане: {is_in_clan}")
         
         return player_id, current_nickname, is_in_clan
         
     except requests.exceptions.Timeout:
         print(f"❌ Таймаут при проверке клана для игрока {nickname}")
         return None, None, False
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Ошибка запроса при проверке игрока {nickname}: {e}")
+        return None, None, False
     except Exception as e:
-        print(f"❌ Ошибка при проверке клана для игрока {nickname}: {e}")
+        print(f"❌ Неожиданная ошибка при проверке клана для игрока {nickname}: {e}")
+        import traceback
+        traceback.print_exc()
         return None, None, False
 
 async def check_player_in_clan(nickname: str) -> bool:
