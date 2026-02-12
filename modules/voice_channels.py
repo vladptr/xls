@@ -4,6 +4,7 @@ import time
 import asyncio
 import random
 from modules.config import TRIGGER_CHANNELS, BLACKLISTED_CHANNELS, bot
+from modules.registration import CLAN_ROLE_ID
 
 # Глобальные переменные для голосовых каналов
 setup_messages = {}
@@ -112,7 +113,7 @@ class PlayerCountSelect(Select):
             return
 
         count = self.values[0]
-        msg = f"+{count} <@&1159121098965786634> <#{voice_channel.id}> {interaction.user.mention}"
+        msg = f"+{count} <@&{CLAN_ROLE_ID}> <#{voice_channel.id}> {interaction.user.mention}"
         sent_msg = await text_channel.send(msg)
         await interaction.response.send_message("Сообщение отправлено в канал 'поиск'.", ephemeral=True)
 
