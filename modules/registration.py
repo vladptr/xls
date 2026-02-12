@@ -132,6 +132,20 @@ class RegistrationModal(Modal):
 class RegistrationView(View):
     def __init__(self):
         super().__init__(timeout=None)
+        
+        # Создаем кнопку с custom_id для persistent view
+        login_button = Button(
+            label="Логин",
+            style=discord.ButtonStyle.primary,
+            emoji="🔐",
+            custom_id="registration_login_button"
+        )
+        login_button.callback = self.login_button_callback
+        self.add_item(login_button)
+    
+    async def login_button_callback(self, interaction: discord.Interaction):
+        modal = RegistrationModal()
+        await interaction.response.send_modal(modal)
     
     async def on_error(self, interaction: discord.Interaction, error: Exception, item):
         print(f"❌ Ошибка в RegistrationView: {error}")
@@ -142,11 +156,6 @@ class RegistrationView(View):
             )
         except:
             pass
-    
-    @discord.ui.button(label="Логин", style=discord.ButtonStyle.primary, emoji="🔐")
-    async def login_button(self, interaction: discord.Interaction, button: Button):
-        modal = RegistrationModal()
-        await interaction.response.send_modal(modal)
 
 async def get_player_info(nickname: str):
     """Получает информацию об игроке по нику. Возвращает (player_id, current_nickname, is_in_clan)"""
