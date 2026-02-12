@@ -52,7 +52,15 @@ class RegistrationModal(Modal):
         
         await interaction.response.defer(ephemeral=True)
         
-        print(f"📝 Начало регистрации для пользователя {interaction.user.id} с ником '{nickname}'")
+        # Проверяем, что взаимодействие происходит на сервере, а не в DM
+        if not interaction.guild:
+            await interaction.followup.send(
+                "❌ Регистрация возможна только на сервере. Пожалуйста, используйте форму регистрации на сервере.",
+                ephemeral=True
+            )
+            return
+        
+        print(f"📝 Начало регистрации для пользователя {interaction.user.id} с ником '{nickname}' на сервере {interaction.guild.id}")
         
         # Получаем информацию об игроке по нику (player_id, актуальный ник, статус в клане)
         try:
@@ -123,6 +131,15 @@ class RegistrationModal(Modal):
             # Игрок в клане - привязываем player_id к discord_id
             actual_nickname = current_nickname if current_nickname else nickname
             print(f"✅ Игрок {actual_nickname} найден в клане для пользователя {interaction.user.id}")
+            
+            # Проверяем, что guild существует
+            if not interaction.guild:
+                print(f"❌ Ошибка: interaction.guild равен None для пользователя {interaction.user.id}")
+                await interaction.followup.send(
+                    "❌ Ошибка: взаимодействие не происходит на сервере. Регистрация возможна только на сервере.",
+                    ephemeral=True
+                )
+                return
             
             try:
                 # Выдаем роль
