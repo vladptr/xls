@@ -1,0 +1,8 @@
+build:
+  type: nixpacks
+  env:
+    - PYTHON_VERSION=3.10.13
+
+run:
+  command: python main.py
+
