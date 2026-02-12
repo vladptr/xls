@@ -6,7 +6,7 @@ from modules.config import PUBG_API_KEY, PUBG_PLATFORM, bot, MAIN_GUILD_ID
 from modules.database import supabase
 
 CLAN_ID = "clan.bb296787b8e144959802df1ab9a594da"
-CLAN_ROLE_ID = 1159121098965786634
+CLAN_ROLE_ID = 1372898116877160519
 REGISTRATION_CHANNEL_ID = 1183130293545222205
 
 class RegistrationModal(Modal):
