@@ -74,21 +74,40 @@ class RegistrationModal(Modal):
             return
         
         # Проверяем, не привязан ли уже этот player_id к другому Discord аккаунту
+        # Сначала проверяем по player_id (если колонка существует), затем по нику
         print(f"🔍 Проверка существующих привязок для player_id: {player_id}")
         try:
-            existing_user = supabase.table("user_registrations").select("*").eq("player_id", player_id).execute()
-            print(f"📊 Результат проверки: {len(existing_user.data) if existing_user.data else 0} записей найдено")
-            if existing_user.data:
-                existing_discord_id = existing_user.data[0].get("discord_id")
-                print(f"🔍 Существующий discord_id: {existing_discord_id}, текущий: {interaction.user.id}")
-                if str(existing_discord_id) != str(interaction.user.id):
-                    existing_nickname = existing_user.data[0].get("pubg_nickname", nickname)
-                    print(f"❌ Конфликт привязки: игрок уже привязан к другому аккаунту")
-                    await interaction.followup.send(
-                        f"❌ Игрок с ником '{existing_nickname}' (player_id: {player_id}) уже привязан к другому аккаунту Discord!", 
-                        ephemeral=True
-                    )
-                    return
+            # Пытаемся проверить по player_id
+            try:
+                existing_user = supabase.table("user_registrations").select("*").eq("player_id", player_id).execute()
+                print(f"📊 Проверка по player_id: {len(existing_user.data) if existing_user.data else 0} записей найдено")
+                if existing_user.data:
+                    existing_discord_id = existing_user.data[0].get("discord_id")
+                    print(f"🔍 Существующий discord_id: {existing_discord_id}, текущий: {interaction.user.id}")
+                    if str(existing_discord_id) != str(interaction.user.id):
+                        existing_nickname = existing_user.data[0].get("pubg_nickname", nickname)
+                        print(f"❌ Конфликт привязки: игрок уже привязан к другому аккаунту")
+                        await interaction.followup.send(
+                            f"❌ Игрок с ником '{existing_nickname}' (player_id: {player_id}) уже привязан к другому аккаунту Discord!", 
+                            ephemeral=True
+                        )
+                        return
+            except Exception as e:
+                # Если колонка player_id не существует, проверяем по нику
+                print(f"⚠️ Колонка player_id не найдена, проверяем по нику: {e}")
+                existing_user = supabase.table("user_registrations").select("*").eq("pubg_nickname", current_nickname).execute()
+                print(f"📊 Проверка по нику: {len(existing_user.data) if existing_user.data else 0} записей найдено")
+                if existing_user.data:
+                    existing_discord_id = existing_user.data[0].get("discord_id")
+                    print(f"🔍 Существующий discord_id: {existing_discord_id}, текущий: {interaction.user.id}")
+                    if str(existing_discord_id) != str(interaction.user.id):
+                        existing_nickname = existing_user.data[0].get("pubg_nickname", nickname)
+                        print(f"❌ Конфликт привязки: игрок уже привязан к другому аккаунту")
+                        await interaction.followup.send(
+                            f"❌ Игрок с ником '{existing_nickname}' уже привязан к другому аккаунту Discord!", 
+                            ephemeral=True
+                        )
+                        return
         except Exception as e:
             print(f"❌ Ошибка при проверке существующих привязок: {e}")
             import traceback
@@ -148,14 +167,26 @@ class RegistrationModal(Modal):
                 # Сохраняем данные в базу - привязываем player_id к discord_id
                 print(f"💾 Сохранение данных в базу для пользователя {interaction.user.id}")
                 try:
-                    result = supabase.table("user_registrations").upsert({
+                    # Формируем данные для сохранения
+                    data_to_save = {
                         "discord_id": str(interaction.user.id),
-                        "player_id": player_id,
                         "pubg_nickname": actual_nickname,
                         "name": name,
                         "pubg_plus": pubg_plus == "да",
                         "verified": True
-                    }).execute()
+                    }
+                    
+                    # Пытаемся добавить player_id (если колонка существует)
+                    try:
+                        data_to_save["player_id"] = player_id
+                        result = supabase.table("user_registrations").upsert(data_to_save).execute()
+                        print(f"✅ Данные сохранены с player_id")
+                    except Exception as e:
+                        # Если колонка player_id не существует, сохраняем без неё
+                        print(f"⚠️ Колонка player_id не найдена, сохраняем без неё: {e}")
+                        data_to_save.pop("player_id", None)
+                        result = supabase.table("user_registrations").upsert(data_to_save).execute()
+                        print(f"✅ Данные сохранены без player_id (колонка будет добавлена позже)")
                     
                     print(f"✅ Данные сохранены в базу для пользователя {interaction.user.id}")
                     print(f"📊 Результат сохранения: {result.data if hasattr(result, 'data') else 'OK'}")
