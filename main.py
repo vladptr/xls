@@ -54,6 +54,13 @@ async def main():
             error_str = str(e)
             status_code = getattr(e, 'status', None)
             
+            # Закрываем сессию при ошибке
+            try:
+                if not bot.is_closed():
+                    await bot.close()
+            except:
+                pass
+            
             # Проверяем на rate limit (429 или текст ошибки)
             if status_code == 429 or "429" in error_str or "rate limit" in error_str.lower() or "Too Many Requests" in error_str or "being blocked" in error_str.lower():
                 if attempt < max_retries - 1:
@@ -72,6 +79,14 @@ async def main():
                 raise
         except Exception as e:
             error_str = str(e)
+            
+            # Закрываем сессию при ошибке
+            try:
+                if not bot.is_closed():
+                    await bot.close()
+            except:
+                pass
+            
             # Проверяем на rate limit в тексте ошибки
             if "429" in error_str or "rate limit" in error_str.lower() or "Too Many Requests" in error_str or "being blocked" in error_str.lower():
                 if attempt < max_retries - 1:
@@ -87,5 +102,20 @@ async def main():
                 raise
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n⚠️ Бот остановлен пользователем")
+    except Exception as e:
+        print(f"❌ Критическая ошибка: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        # Убеждаемся, что бот закрыт
+        try:
+            loop = asyncio.get_event_loop()
+            if not bot.is_closed():
+                loop.run_until_complete(bot.close())
+        except:
+            pass
 
