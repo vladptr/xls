@@ -40,7 +40,20 @@ async def main():
     if not token:
         raise ValueError("❌ Переменная окружения TOKEN не установлена!")
     
-    await bot.start(token)
+    print(f"🔄 Попытка подключения к Discord...")
+    try:
+        await bot.start(token)
+        print("✅ Бот успешно подключен!")
+    except discord.errors.HTTPException as e:
+        print(f"❌ HTTP ошибка при подключении:")
+        print(f"   Статус: {getattr(e, 'status', 'Unknown')}")
+        print(f"   Код ошибки: {getattr(e, 'code', 'Unknown')}")
+        print(f"   Сообщение: {str(e)[:500]}")
+        raise
+    except Exception as e:
+        print(f"❌ Ошибка при подключении: {type(e).__name__}")
+        print(f"   Сообщение: {str(e)[:500]}")
+        raise
 
 if __name__ == "__main__":
     try:
