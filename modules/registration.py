@@ -149,12 +149,26 @@ class RegistrationModal(Modal):
                 return
             
             try:
+                # Получаем участника сервера (Member), чтобы работать с ролями и никнеймом
+                member = guild.get_member(interaction.user.id)
+                if not member:
+                    # Если участник не найден в кэше, пробуем получить его напрямую
+                    try:
+                        member = await guild.fetch_member(interaction.user.id)
+                    except Exception:
+                        print(f"⚠️ Участник {interaction.user.id} не найден на сервере {guild.id}")
+                        await interaction.followup.send(
+                            "❌ Не удалось найти вас на сервере. Убедитесь, что вы на сервере и попробуйте снова.",
+                            ephemeral=True
+                        )
+                        return
+                
                 # Выдаем роль
                 role = guild.get_role(CLAN_ROLE_ID)
                 print(f"🔍 Поиск роли с ID {CLAN_ROLE_ID}: {role}")
                 if role:
                     try:
-                        await interaction.user.add_roles(role)
+                        await member.add_roles(role)
                         print(f"✅ Роль выдана пользователю {interaction.user.id}")
                     except Exception as e:
                         print(f"❌ Ошибка при выдаче роли пользователю {interaction.user.id}: {e}")
@@ -174,15 +188,6 @@ class RegistrationModal(Modal):
                     return
                 
                 # Меняем никнейм пользователя на формат "ник (имя)"
-                # Получаем участника сервера для изменения никнейма
-                member = guild.get_member(interaction.user.id)
-                if not member:
-                    # Если участник не найден на сервере, пытаемся получить его через fetch
-                    try:
-                        member = await guild.fetch_member(interaction.user.id)
-                    except:
-                        print(f"⚠️ Участник {interaction.user.id} не найден на сервере {guild.id}")
-                        member = None
                 
                 new_nickname = f"{actual_nickname} ({name})"
                 print(f"🔍 Попытка изменить никнейм на: {new_nickname}")
