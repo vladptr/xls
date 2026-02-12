@@ -16,6 +16,9 @@ intents.voice_states = True
 intents.messages = True
 intents.message_content = True
 
+# ID основного сервера (guild), с которым работает бот
+MAIN_GUILD_ID = 1371926685435428924
+
 # Bot setup
 bot = commands.Bot(command_prefix="!", intents=intents)
 LEADERBOARD_CHANNEL_ID = 1371926685435428927
