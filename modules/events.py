@@ -363,7 +363,9 @@ async def weekly_reset():
         days_until_wednesday = (2 - now.weekday() + 7) % 7
         if days_until_wednesday == 0:
             days_until_wednesday = 7
-        next_reset = datetime.combine((now + timedelta(days=days_until_wednesday)).date(), datetime.min.time())
+        next_reset_date = (now + timedelta(days=days_until_wednesday)).date()
+        next_reset = datetime.combine(next_reset_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+        
         wait_time = (next_reset - now).total_seconds()
         print(f"⏳ Ожидание до следующей среды: {wait_time // 3600:.0f}ч {(wait_time % 3600) // 60:.0f}м")
         await asyncio.sleep(wait_time)
@@ -423,4 +425,5 @@ async def weekly_reset():
 
         except Exception as e:
             print(f"❌ Ошибка при сбросе статистики: {e}")
+
 
