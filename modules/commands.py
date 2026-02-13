@@ -1,11 +1,13 @@
 import discord
 from discord.ext import commands
-from modules.config import bot, AUTHORIZED_USER_ID
+from modules.config import bot, AUTHORIZED_USER_ID, AI_SYSTEM_PROMPT, AI_PROVIDER, AI_ENABLED
 from modules.database import supabase
 from modules.leveling import update_experience
 from modules.pubg_stats import stat as pubg_stat
 from modules.leaderboard import leaderboard as leaderboard_func
 from modules.registration import RegistrationView, REGISTRATION_CHANNEL_ID
+from modules.ai_chat import chat
+from modules.ai_chat import chat
 
 @bot.command(name="clearmsg")
 @commands.has_permissions(manage_messages=False)
@@ -320,4 +322,55 @@ async def rebind(ctx, nickname: str = None):
     except Exception as e:
         await ctx.send(f"❌ Ошибка при перепривязке аккаунта: {e}")
         print(f"❌ Ошибка при перепривязке аккаунта для {ctx.author.id}: {e}")
+
+
+@bot.command(name="chat", aliases=["ai", "ask"])
+async def chat_command(ctx, *, message: str = None):
+    """Чат с языковой моделью через внешний API
+    
+    Использование: !chat ваш вопрос
+    Пример: !chat Что такое PUBG?
+    """
+    if not message:
+        await ctx.send("❌ Укажите ваш вопрос. Использование: `!chat ваш вопрос`")
+        return
+    
+    # Отправляем сообщение о загрузке
+    loading_msg = await ctx.send("🤔 Думаю...")
+    
+    try:
+        # Проверяем, включен ли AI
+        if not AI_ENABLED:
+            await loading_msg.edit(content="❌ AI чат отключен. Включите его через переменную окружения AI_ENABLED=true")
+            return
+        
+        # Получаем ответ от AI
+        response = await chat(
+            message=message,
+            provider=AI_PROVIDER,
+            system_prompt=AI_SYSTEM_PROMPT
+        )
+        
+        if response:
+            # Удаляем сообщение о загрузке
+            await loading_msg.delete()
+            
+            # Отправляем ответ (ограничиваем длину для Discord)
+            if len(response) > 2000:
+                response = response[:1997] + "..."
+            
+            embed = discord.Embed(
+                title="🤖 Ответ AI",
+                description=response,
+                color=discord.Color.blue()
+            )
+            embed.set_footer(text=f"Запрос от {ctx.author.display_name}")
+            
+            await ctx.send(embed=embed)
+        else:
+            await loading_msg.edit(content="❌ Не удалось получить ответ от AI. Проверьте настройки API ключей.")
+            
+    except Exception as e:
+        await loading_msg.edit(content=f"❌ Ошибка при обращении к AI: {e}")
+        print(f"❌ Ошибка в команде chat: {e}")
 
