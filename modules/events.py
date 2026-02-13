@@ -236,7 +236,7 @@ async def on_message(message):
     if message.author == bot.user:
         return
     
-    # Пропускаем команды (они обрабатываются через commands)
+    # Обрабатываем команды в первую очередь
     if message.content.startswith(bot.command_prefix):
         await bot.process_commands(message)
         return
@@ -283,8 +283,7 @@ async def on_message(message):
             import traceback
             traceback.print_exc()
     
-    # Важно: обрабатываем команды даже если бот не упомянут
-    await bot.process_commands(message)
+    # Команды уже обработаны выше, не нужно вызывать process_commands повторно
 
 
 @bot.event
