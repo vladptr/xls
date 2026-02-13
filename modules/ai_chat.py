@@ -4,6 +4,7 @@
 """
 import os
 import requests
+from requests.exceptions import Timeout, RequestException
 import asyncio
 from typing import Optional
 
@@ -46,6 +47,7 @@ async def chat_with_groq(
     
     if not api_key:
         print("⚠️ GROQ_API_KEY не установлен. Получите ключ на https://console.groq.com/")
+        print(f"🔍 Проверка переменных окружения: GROQ_API_KEY = {os.getenv('GROQ_API_KEY', 'НЕ НАЙДЕН')}")
         return None
     
     # Проверяем формат ключа
