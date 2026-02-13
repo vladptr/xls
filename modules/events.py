@@ -2,7 +2,7 @@ import discord
 import asyncio
 import random
 from datetime import datetime, timezone, timedelta
-from modules.config import bot, BLACKLISTED_CHANNELS, TRIGGER_CHANNELS
+from modules.config import bot, BLACKLISTED_CHANNELS, TRIGGER_CHANNELS, MAIN_GUILD_ID
 from modules.database import supabase
 from modules.voice_channels import (
     setup_messages, channel_locks, room_modes, created_channels, 
@@ -422,8 +422,8 @@ async def check_and_cleanup_left_users():
             print("⚠️ Бот не подключен ни к одному серверу")
             return
         
-        # Используем первый сервер
-        guild = guilds[0]
+        # Используем основной сервер по ID
+        guild = discord.utils.get(guilds, id=MAIN_GUILD_ID) or guilds[0]
         
         # Получаем всех пользователей из базы
         all_user_ids = set()
@@ -487,10 +487,10 @@ async def clan_verification_check():
         await asyncio.sleep(10800)  # 3 часа = 10800 секунд
         
         try:
-            # Получаем первую гильдию бота
+            # Получаем основную гильдию по ID
             guilds = bot.guilds
             if guilds:
-                guild = guilds[0]
+                guild = discord.utils.get(guilds, id=MAIN_GUILD_ID) or guilds[0]
                 print(f"🔄 Запуск проверки участников клана на сервере {guild.id}...")
                 await check_all_members_in_clan(guild)
                 
