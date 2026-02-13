@@ -133,7 +133,7 @@ class RegistrationModal(Modal):
             except Exception as e:
                 # Если колонка player_id не существует, проверяем по нику
                 print(f"⚠️ Колонка player_id не найдена, проверяем по нику: {e}")
-                existing_user = supabase.table("user_registrations").select("*").eq("pubg_nickname", current_nickname).execute()
+                existing_user = db.table("user_registrations").select("*").eq("pubg_nickname", current_nickname).execute()
                 print(f"📊 Проверка по нику: {len(existing_user.data) if existing_user.data else 0} записей найдено")
                 if existing_user.data:
                     existing_discord_id = existing_user.data[0].get("discord_id")
