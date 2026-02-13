@@ -13,10 +13,11 @@ try:
     from modules.config import bot
     print("✅ modules.config импортирован")
 except Exception as e:
-    print(f"❌ Ошибка при импорте modules.config: {e}")
+    print(f"❌ КРИТИЧЕСКАЯ ОШИБКА при импорте modules.config: {e}")
     import traceback
     traceback.print_exc()
-    sys.exit(1)
+    # Не завершаем процесс сразу - даем возможность увидеть другие ошибки
+    raise
 
 try:
     print("[2/5] Импорт modules.database...")
@@ -31,30 +32,30 @@ try:
     from modules import commands
     print("✅ modules.commands импортирован")
 except Exception as e:
-    print(f"❌ Ошибка при импорте modules.commands: {e}")
+    print(f"❌ КРИТИЧЕСКАЯ ОШИБКА при импорте modules.commands: {e}")
     import traceback
     traceback.print_exc()
-    sys.exit(1)
+    raise
 
 try:
     print("[4/5] Импорт modules.events...")
     from modules import events
     print("✅ modules.events импортирован")
 except Exception as e:
-    print(f"❌ Ошибка при импорте modules.events: {e}")
+    print(f"❌ КРИТИЧЕСКАЯ ОШИБКА при импорте modules.events: {e}")
     import traceback
     traceback.print_exc()
-    sys.exit(1)
+    raise
 
 try:
     print("[5/5] Импорт RegistrationView...")
     from modules.registration import RegistrationView
     print("✅ RegistrationView импортирован")
 except Exception as e:
-    print(f"❌ Ошибка при импорте RegistrationView: {e}")
+    print(f"❌ КРИТИЧЕСКАЯ ОШИБКА при импорте RegistrationView: {e}")
     import traceback
     traceback.print_exc()
-    sys.exit(1)
+    raise
 
 print("=" * 50)
 print("✅ ВСЕ МОДУЛИ УСПЕШНО ИМПОРТИРОВАНЫ")
