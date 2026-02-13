@@ -37,12 +37,13 @@ TRIGGER_CHANNELS = {
 AUTHORIZED_USER_ID = 455023858463014922
 
 # Main Guild ID - берется из переменной окружения или использует значение по умолчанию
-MAIN_GUILD_ID = int(os.getenv("MAIN_GUILD_ID", "1371926685435428924"))
+MAIN_GUILD_ID = int(os.getenv("MAIN_GUILD_ID", "520183812148166656"))
 
 # FFmpeg setup (только для Linux/Mac, на Windows пропускается)
 try:
     subprocess.run(["chmod", "+x", "./ffmpeg"], check=False)
 except:
     pass  # Игнорируем ошибку на Windows
+
 
 
