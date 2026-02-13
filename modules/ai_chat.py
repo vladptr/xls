@@ -75,8 +75,9 @@ async def chat_with_groq(
             {"role": "user", "content": message}
         ],
         "model": model_name,
-        "temperature": 0.7,
-        "max_tokens": 500
+        "temperature": 0.8,  # Увеличено для более креативных ответов
+        "max_tokens": 300,  # Уменьшено для более кратких ответов
+        "top_p": 0.9  # Добавлено для лучшего качества ответов
     }
     
     try:
