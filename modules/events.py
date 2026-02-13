@@ -342,12 +342,18 @@ async def on_voice_state_update(member, before, after):
         print(f"❌ Ошибка при обновлении статистики: {e}")
         
     try:
+        # Получаем экземпляр supabase
+        db = get_supabase()
+        if not db:
+            print(f"⚠️ Не удалось подключиться к базе данных для обновления статистики")
+            return
+        
         if after.channel and not before.channel:
             if after.channel.id in BLACKLISTED_CHANNELS:
                 return
 
             # Пользователь зашёл в голосовой — добавляем сессию
-            response = supabase.table("voice_sessions").insert({
+            response = db.table("voice_sessions").insert({
                 "user_id": user_id,
                 "start_time": now
             }).execute()
@@ -356,7 +362,7 @@ async def on_voice_state_update(member, before, after):
             if before.channel.id in BLACKLISTED_CHANNELS:
                 return
             # Пользователь вышел из голосового — получаем время старта
-            row = supabase.table("voice_sessions").select("start_time").eq("user_id", user_id).limit(1).execute()
+            row = db.table("voice_sessions").select("start_time").eq("user_id", user_id).limit(1).execute()
 
             if not row.data:
                 print(f"❌ Не найдена сессия для пользователя {user_id}")
@@ -366,22 +372,22 @@ async def on_voice_state_update(member, before, after):
             duration = int(now - start_time)
 
             # Удаляем сессию
-            del_resp = supabase.table("voice_sessions").delete().eq("user_id", user_id).execute()
+            del_resp = db.table("voice_sessions").delete().eq("user_id", user_id).execute()
             if not del_resp.data:
                 print(f"❌ Ошибка при удалении сессии")
 
             # Обновляем/вставляем время в voice_time
-            time_row = supabase.table("voice_time").select("*").eq("user_id", user_id).limit(1).execute()
+            time_row = db.table("voice_time").select("*").eq("user_id", user_id).limit(1).execute()
             if time_row.data:
                 total_seconds_week = time_row.data[0]["total_seconds"] + duration
                 total_seconds_all_time = time_row.data[0].get("total_seconds_all_time", 0) + duration
 
-                supabase.table("voice_time").update({
+                db.table("voice_time").update({
                     "total_seconds": total_seconds_week,
                     "total_seconds_all_time": total_seconds_all_time
                 }).eq("user_id", user_id).execute()
             else:
-                supabase.table("voice_time").insert({
+                db.table("voice_time").insert({
                     "user_id": user_id,
                     "total_seconds": duration,
                     "total_seconds_all_time": duration
@@ -591,20 +597,26 @@ async def weekly_reset():
         await asyncio.sleep(wait_time)
 
         try:
+            # Получаем экземпляр supabase
+            db = get_supabase()
+            if not db:
+                print("⚠️ Не удалось подключиться к базе данных для еженедельного сброса")
+                return
+            
             print("🔄 Запуск еженедельного сброса...")
-            row = supabase.table("weekly_voice_stats").select("cycle_number").order("cycle_number", desc=True).limit(1).execute()
+            row = db.table("weekly_voice_stats").select("cycle_number").order("cycle_number", desc=True).limit(1).execute()
             cycle_number = row.data[0]["cycle_number"] if row.data else 0
-            week_data = supabase.table("weekly_voice_stats").select("week_number").eq("cycle_number", cycle_number).order("week_number", desc=True).limit(1).execute()
+            week_data = db.table("weekly_voice_stats").select("week_number").eq("cycle_number", cycle_number).order("week_number", desc=True).limit(1).execute()
             max_week_number = week_data.data[0]["week_number"] if week_data.data else 0
             if max_week_number >= 12:
                 cycle_number += 1
                 max_week_number = 0
 
-            voice_time_rows = supabase.table("voice_time").select("user_id", "total_seconds").execute()
+            voice_time_rows = db.table("voice_time").select("user_id", "total_seconds").execute()
 
             user_times = []
             # Получаем всех пользователей, которые когда-либо были в голосовых каналах
-            all_users_with_stats = supabase.table("weekly_voice_stats").select("user_id").execute()
+            all_users_with_stats = db.table("weekly_voice_stats").select("user_id").execute()
             all_user_ids = set()
             if all_users_with_stats.data:
                 all_user_ids = {record["user_id"] for record in all_users_with_stats.data}
@@ -639,7 +651,7 @@ async def weekly_reset():
                 update_experience(user_id, exp)
 
                 # Сохраняем статистику
-                supabase.table("weekly_voice_stats").insert({
+                db.table("weekly_voice_stats").insert({
                     "cycle_number": cycle_number,
                     "week_number": max_week_number + 1,
                     "user_id": user_id,
@@ -649,10 +661,10 @@ async def weekly_reset():
             # Сохраняем записи с 0 часов для всех пользователей, которые были активны ранее, но не на этой неделе
             for user_id in all_user_ids:
                 # Проверяем, есть ли уже запись для этого пользователя на этой неделе
-                existing_week = supabase.table("weekly_voice_stats").select("*").eq("user_id", user_id).eq("cycle_number", cycle_number).eq("week_number", max_week_number + 1).execute()
+                existing_week = db.table("weekly_voice_stats").select("*").eq("user_id", user_id).eq("cycle_number", cycle_number).eq("week_number", max_week_number + 1).execute()
                 if not existing_week.data:
                     # Создаем запись с 0 часов для правильного расчета среднего
-                    supabase.table("weekly_voice_stats").insert({
+                    db.table("weekly_voice_stats").insert({
                         "cycle_number": cycle_number,
                         "week_number": max_week_number + 1,
                         "user_id": user_id,
@@ -662,7 +674,7 @@ async def weekly_reset():
             # Обнуляем voice_time только для пользователей, у которых есть записи
             for record in voice_time_rows.data:
                 user_id = record["user_id"]
-                supabase.table("voice_time").update({"total_seconds": 0}).eq("user_id", user_id).execute()
+                db.table("voice_time").update({"total_seconds": 0}).eq("user_id", user_id).execute()
 
             print("📅 Статистика по времени в голосовых сброшена!")
 
