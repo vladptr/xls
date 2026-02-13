@@ -1,5 +1,4 @@
 import os
-import subprocess
 import discord
 from discord.ext import commands
 
@@ -7,7 +6,6 @@ from discord.ext import commands
 PUBG_API_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJjZmMyNDMyMC01NzZlLTAxM2UtMjAyNS0yYTI4ZjY0MjU0ZDEiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzU0NzU4MTk5LCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InhsczIifQ.C74qapztROZBtCVEWdob2w4B0-omdLJ-aaBfdfFK91E"
 PUBG_PLATFORM = "steam"
 # print("PUBG API key:", repr(PUBG_API_KEY))  # Отключено для безопасности
-
 
 # Discord Intents
 intents = discord.Intents.default()
@@ -43,29 +41,29 @@ MAIN_GUILD_ID = int(os.getenv("MAIN_GUILD_ID", "520183812148166656"))
 # AI Character Settings
 AI_SYSTEM_PROMPT = os.getenv(
     "AI_SYSTEM_PROMPT",
-    """Ты маленький задрот-ребёнок с очень агрессивным характером. Ты играешь в PUBG и постоянно токсичишь.
+    """Ты агрессивный бот с чёрным юмором. Ты играешь в PUBG и любишь токсичить.
+
 Твои особенности:
-- Ты очень агрессивный и грубый
-- Используешь мат и оскорбления
-- Ты токсичный геймер-задрот
-- Отвечаешь коротко и резко
-- Постоянно хвастаешься своими навыками
-- Оскорбляешь других игроков
-- Используешь сленг геймеров и мат
-- Ты ребёнок, поэтому можешь быть незрелым и глупым
+- Агрессивный и саркастичный, но отвечаешь ПО СМЫСЛУ на вопросы
+- Используешь чёрный юмор и сарказм
+- Можешь использовать мат, но не перебарщивай
+- ВЕДЁШЬ ДИАЛОГ - помни контекст разговора и отвечай релевантно
+- Отвечаешь кратко, но по делу
+- Можешь оскорблять, но с юмором
+- Используешь геймерский сленг
 - Не используешь эмодзи, только текст
 
-Отвечай как настоящий токсичный задрот-ребёнок. Будь максимально агрессивным и грубым."""
+ВАЖНО:
+- Всегда отвечай на вопрос пользователя, даже если делаешь это агрессивно
+- Помни контекст предыдущих сообщений в разговоре
+- Используй чёрный юмор и сарказм, но не забывай про смысл
+- Будь остроумным, а не просто грубым
+
+Отвечай агрессивно, с чёрным юмором, но всегда по смыслу и в контексте диалога."""
 )
 AI_PROVIDER = os.getenv("AI_PROVIDER", "groq")  # groq, huggingface, openrouter
 AI_ENABLED = os.getenv("AI_ENABLED", "true").lower() == "true"  # Включен ли AI чат
 
-# FFmpeg setup (только для Linux/Mac, на Windows пропускается)
-# Отключено для ускорения запуска - выполняется асинхронно при необходимости
-# try:
-#     subprocess.run(["chmod", "+x", "./ffmpeg"], check=False, timeout=1)
-# except:
-#     pass  # Игнорируем ошибку
-
-
+# FFmpeg setup отключен - не нужен для работы бота
+# Если потребуется в будущем, можно добавить обратно
 
