@@ -2,7 +2,7 @@ import discord
 import asyncio
 import random
 from datetime import datetime, timezone, timedelta
-from modules.config import bot, BLACKLISTED_CHANNELS, TRIGGER_CHANNELS, MAIN_GUILD_ID
+from modules.config import bot, BLACKLISTED_CHANNELS, TRIGGER_CHANNELS, MAIN_GUILD_ID, AI_SYSTEM_PROMPT, AI_PROVIDER, AI_ENABLED
 from modules.database import supabase
 from modules.voice_channels import (
     setup_messages, channel_locks, room_modes, created_channels, 
@@ -228,6 +228,64 @@ async def on_member_join(member):
             print("Канал для регистрации не найден.")
     except Exception as e:
         print(f"❌ Ошибка при отправке сообщения регистрации пользователю {member.id}: {e}")
+
+@bot.event
+async def on_message(message):
+    """Обработчик сообщений - отвечает на упоминания бота"""
+    # Пропускаем сообщения от бота
+    if message.author == bot.user:
+        return
+    
+    # Пропускаем команды (они обрабатываются через commands)
+    if message.content.startswith(bot.command_prefix):
+        await bot.process_commands(message)
+        return
+    
+    # Проверяем, упомянут ли бот в сообщении
+    bot_mentioned = bot.user in message.mentions
+    
+    if bot_mentioned and AI_ENABLED:
+        try:
+            # Убираем упоминание бота из текста для более чистого запроса
+            content = message.content
+            # Удаляем все упоминания бота
+            for mention in message.mentions:
+                content = content.replace(f"<@{mention.id}>", "").replace(f"<@!{mention.id}>", "")
+            content = content.strip()
+            
+            # Если после удаления упоминаний остался только пустой текст, используем исходное сообщение
+            if not content:
+                content = message.content
+            
+            # Импортируем функцию чата
+            from modules.ai_chat import chat
+            
+            # Отправляем запрос в AI с агрессивным характером
+            response = await chat(
+                message=content,
+                provider=AI_PROVIDER,
+                system_prompt=AI_SYSTEM_PROMPT
+            )
+            
+            if response:
+                # Ограничиваем длину ответа для Discord
+                if len(response) > 2000:
+                    response = response[:1997] + "..."
+                
+                # Отправляем ответ
+                await message.channel.send(response)
+            else:
+                # Если AI не ответил, можно отправить дефолтный ответ или ничего не делать
+                pass
+                
+        except Exception as e:
+            print(f"❌ Ошибка при обработке сообщения с упоминанием бота: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    # Важно: обрабатываем команды даже если бот не упомянут
+    await bot.process_commands(message)
+
 
 @bot.event
 async def on_voice_state_update(member, before, after):
