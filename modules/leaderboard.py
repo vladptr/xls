@@ -2,7 +2,7 @@ import discord
 from discord.ui import View, Button
 import math
 import asyncio
-from modules.database import supabase
+from modules.database import supabase, get_supabase
 from modules.config import bot
 
 class LeaderboardView(View):
@@ -70,7 +70,13 @@ class LeaderboardView(View):
 
 async def leaderboard(ctx):
     try:
-        response = supabase.table("voice_time")\
+        # Получаем экземпляр supabase
+        db = get_supabase()
+        if not db:
+            await ctx.send("❌ Ошибка подключения к базе данных. Обратитесь к администратору.")
+            return
+        
+        response = db.table("voice_time")\
             .select("user_id,total_seconds")\
             .order("total_seconds", desc=True)\
             .limit(50)\
