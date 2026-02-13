@@ -6,8 +6,9 @@ from modules.config import PUBG_API_KEY, PUBG_PLATFORM, bot
 from modules.database import supabase
 
 CLAN_ID = "clan.bb296787b8e144959802df1ab9a594da"
-CLAN_ROLE_ID = 1372898116877160519
+CLAN_ROLE_ID = 1471484068758683709
 REGISTRATION_CHANNEL_ID = 1183130293545222205
+MAIN_GUILD_ID = 520183812148166656
 
 class RegistrationModal(Modal):
     def __init__(self):
@@ -53,13 +54,13 @@ class RegistrationModal(Modal):
         
         await interaction.response.defer(ephemeral=True)
         
-        # Получаем сервер - либо из interaction, либо первый доступный сервер
+        # Получаем сервер - либо из interaction, либо основной сервер по ID
         guild = interaction.guild
         if not guild:
-            # Если форма открыта в DM, находим первый доступный сервер
+            # Если форма открыта в DM, находим основной сервер по ID
             if bot.guilds:
-                guild = bot.guilds[0]
-                print(f"⚠️ Форма открыта в DM, используем первый сервер бота: {guild.id}")
+                guild = discord.utils.get(bot.guilds, id=MAIN_GUILD_ID) or bot.guilds[0]
+                print(f"⚠️ Форма открыта в DM, используем основной сервер бота: {guild.id}")
             else:
                 await interaction.followup.send(
                     "❌ Бот не подключен к основному серверу. Обратитесь к администратору.",
