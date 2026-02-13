@@ -4,18 +4,23 @@ import requests
 import asyncio
 import os
 from modules.config import PUBG_API_KEY, PUBG_PLATFORM, bot, MAIN_GUILD_ID
-from modules.database import supabase
+from modules.database import supabase, get_supabase
 
 CLAN_ID = "clan.bb296787b8e144959802df1ab9a594da"
-# ID роли клана - берется из переменной окружения или использует значение по умолчанию
-CLAN_ROLE_ID = int(os.getenv("CLAN_ROLE_ID", "1159121098965786634"))
 REGISTRATION_CHANNEL_ID = 1183130293545222205
-# MAIN_GUILD_ID уже импортирован из config
 
-# Логирование загруженных значений при импорте модуля
-print(f"📋 Модуль registration.py загружен:")
-print(f"   CLAN_ROLE_ID = {CLAN_ROLE_ID} (из {'переменной окружения CLAN_ROLE_ID' if os.getenv('CLAN_ROLE_ID') else 'значения по умолчанию'})")
-print(f"   MAIN_GUILD_ID = {MAIN_GUILD_ID} (из {'переменной окружения MAIN_GUILD_ID' if os.getenv('MAIN_GUILD_ID') else 'значения по умолчанию'})")
+def get_clan_role_id():
+    """Получает ID роли клана из переменной окружения или использует значение по умолчанию"""
+    role_id = os.getenv("CLAN_ROLE_ID", "1159121098965786634")
+    return int(role_id)
+
+# Для обратной совместимости создаем переменную, но она будет перечитываться при каждом использовании
+CLAN_ROLE_ID = get_clan_role_id()
+
+# Логирование загруженных значений при импорте модуля (отключено для ускорения запуска)
+# print(f"📋 Модуль registration.py загружен:")
+# print(f"   CLAN_ROLE_ID = {CLAN_ROLE_ID} (из {'переменной окружения CLAN_ROLE_ID' if os.getenv('CLAN_ROLE_ID') else 'значения по умолчанию'})")
+# print(f"   MAIN_GUILD_ID = {MAIN_GUILD_ID} (из {'переменной окружения MAIN_GUILD_ID' if os.getenv('MAIN_GUILD_ID') else 'значения по умолчанию'})")
 
 class RegistrationModal(Modal):
     def __init__(self):
@@ -96,13 +101,23 @@ class RegistrationModal(Modal):
             )
             return
         
+        # Получаем экземпляр supabase (инициализируем если нужно)
+        from modules.database import get_supabase
+        db = get_supabase()
+        if not db:
+            await interaction.followup.send(
+                "❌ Ошибка подключения к базе данных. Обратитесь к администратору.",
+                ephemeral=True
+            )
+            return
+        
         # Проверяем, не привязан ли уже этот player_id к другому Discord аккаунту
         # Сначала проверяем по player_id (если колонка существует), затем по нику
         print(f"🔍 Проверка существующих привязок для player_id: {player_id}")
         try:
             # Пытаемся проверить по player_id
             try:
-                existing_user = supabase.table("user_registrations").select("*").eq("player_id", player_id).execute()
+                existing_user = db.table("user_registrations").select("*").eq("player_id", player_id).execute()
                 print(f"📊 Проверка по player_id: {len(existing_user.data) if existing_user.data else 0} записей найдено")
                 if existing_user.data:
                     existing_discord_id = existing_user.data[0].get("discord_id")
@@ -171,12 +186,13 @@ class RegistrationModal(Modal):
                         )
                         return
                 
-                # Выдаем роль
-                print(f"🔍 [DEBUG] Текущее значение CLAN_ROLE_ID: {CLAN_ROLE_ID}")
-                print(f"🔍 [DEBUG] Тип CLAN_ROLE_ID: {type(CLAN_ROLE_ID)}")
+                # Выдаем роль - читаем значение заново из переменной окружения
+                current_role_id = get_clan_role_id()
+                print(f"🔍 [DEBUG] Текущее значение CLAN_ROLE_ID: {current_role_id}")
+                print(f"🔍 [DEBUG] Переменная окружения CLAN_ROLE_ID: {os.getenv('CLAN_ROLE_ID', 'не установлена')}")
                 print(f"🔍 [DEBUG] ID сервера: {guild.id}")
-                role = guild.get_role(CLAN_ROLE_ID)
-                print(f"🔍 Поиск роли с ID {CLAN_ROLE_ID}: {role}")
+                role = guild.get_role(current_role_id)
+                print(f"🔍 Поиск роли с ID {current_role_id}: {role}")
                 if role:
                     try:
                         await member.add_roles(role)
@@ -191,7 +207,7 @@ class RegistrationModal(Modal):
                         )
                         return
                 else:
-                    print(f"⚠️ Роль с ID {CLAN_ROLE_ID} не найдена на сервере!")
+                    print(f"⚠️ Роль с ID {current_role_id} не найдена на сервере!")
                     await interaction.followup.send(
                         f"⚠️ Роль клана не найдена на сервере. Обратитесь к администратору.",
                         ephemeral=True
@@ -232,13 +248,13 @@ class RegistrationModal(Modal):
                     # Пытаемся добавить player_id (если колонка существует)
                     try:
                         data_to_save["player_id"] = player_id
-                        result = supabase.table("user_registrations").upsert(data_to_save).execute()
+                        result = db.table("user_registrations").upsert(data_to_save).execute()
                         print(f"✅ Данные сохранены с player_id")
                     except Exception as e:
                         # Если колонка player_id не существует, сохраняем без неё
                         print(f"⚠️ Колонка player_id не найдена, сохраняем без неё: {e}")
                         data_to_save.pop("player_id", None)
-                        result = supabase.table("user_registrations").upsert(data_to_save).execute()
+                        result = db.table("user_registrations").upsert(data_to_save).execute()
                         print(f"✅ Данные сохранены без player_id (колонка будет добавлена позже)")
                     
                     print(f"✅ Данные сохранены в базу для пользователя {interaction.user.id}")
@@ -399,13 +415,21 @@ async def check_player_by_id(player_id: str):
 async def check_all_members_in_clan(guild: discord.Guild):
     """Проверяет всех участников с ролью клана и удаляет роль если игрока нет в клане"""
     try:
-        role = guild.get_role(CLAN_ROLE_ID)
+        from modules.database import get_supabase
+        db = get_supabase()
+        if not db:
+            print("❌ Не удалось подключиться к базе данных для проверки клана")
+            return
+        
+        current_role_id = get_clan_role_id()
+        print(f"🔍 [DEBUG] Проверка клана: используем роль с ID {current_role_id}")
+        role = guild.get_role(current_role_id)
         if not role:
-            print(f"❌ Роль с ID {CLAN_ROLE_ID} не найдена")
+            print(f"❌ Роль с ID {current_role_id} не найдена")
             return
         
         # Получаем всех зарегистрированных пользователей
-        registrations = supabase.table("user_registrations").select("*").execute()
+        registrations = db.table("user_registrations").select("*").execute()
         
         if not registrations.data:
             print("ℹ️ Нет зарегистрированных пользователей для проверки")
@@ -433,7 +457,7 @@ async def check_all_members_in_clan(guild: discord.Guild):
                 member = guild.get_member(int(discord_id))
                 if not member:
                     # Участник покинул сервер, удаляем запись
-                    supabase.table("user_registrations").delete().eq("discord_id", discord_id).execute()
+                    db.table("user_registrations").delete().eq("discord_id", discord_id).execute()
                     continue
                 
                 # Проверяем игрока по player_id (привязка по ID аккаунта в игре)
@@ -451,7 +475,7 @@ async def check_all_members_in_clan(guild: discord.Guild):
                     # Игрок в клане - выдаем роль если её нет
                     if not has_role:
                         await member.add_roles(role)
-                        supabase.table("user_registrations").update({
+                        db.table("user_registrations").update({
                             "verified": True
                         }).eq("discord_id", discord_id).execute()
                         print(f"✅ Выдана роль пользователю {member.display_name} ({current_nickname})")
@@ -462,7 +486,7 @@ async def check_all_members_in_clan(guild: discord.Guild):
                     
                     # Обновляем ник в базе если он изменился
                     if current_nickname != pubg_nickname:
-                        supabase.table("user_registrations").update({
+                        db.table("user_registrations").update({
                             "pubg_nickname": current_nickname
                         }).eq("discord_id", discord_id).execute()
                         print(f"📝 Обновлен ник в базе для {member.display_name}: {pubg_nickname} -> {current_nickname}")
@@ -478,7 +502,7 @@ async def check_all_members_in_clan(guild: discord.Guild):
                     # Игрок не в клане - забираем роль если она есть
                     if has_role:
                         await member.remove_roles(role)
-                        supabase.table("user_registrations").update({
+                        db.table("user_registrations").update({
                             "verified": False
                         }).eq("discord_id", discord_id).execute()
                         removed_count += 1
