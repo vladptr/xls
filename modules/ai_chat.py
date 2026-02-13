@@ -14,9 +14,10 @@ HUGGINGFACE_API_URL = "https://api-inference.huggingface.co/models"
 
 # Доступные модели
 GROQ_MODELS = {
-    "llama": "llama-3.1-70b-versatile",
-    "mixtral": "mixtral-8x7b-32768",
-    "gemma": "gemma-7b-it"
+    "llama": "llama-3.1-8b-instant",  # Стабильная быстрая модель (llama-3.1-70b-versatile выведена из эксплуатации)
+    "llama-fast": "llama-3.1-8b-instant",  # Быстрая модель
+    "mixtral": "mixtral-8x7b-32768",  # Альтернативная модель
+    "gemma": "gemma2-9b-it"  # Альтернативная модель
 }
 
 HUGGINGFACE_MODELS = {
