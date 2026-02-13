@@ -1,75 +1,201 @@
 import os
+import sys
 import asyncio
 import discord
-from modules.config import bot
-from modules.database import init_db
-from modules import commands
-from modules import events
-from modules.registration import RegistrationView
+
+# Добавляем обработку ошибок при импорте
+print("=" * 50)
+print("📦 НАЧАЛО ИМПОРТА МОДУЛЕЙ")
+print("=" * 50)
+
+try:
+    print("[1/5] Импорт modules.config...")
+    from modules.config import bot
+    print("✅ modules.config импортирован")
+except Exception as e:
+    print(f"❌ Ошибка при импорте modules.config: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+
+try:
+    print("[2/5] Импорт modules.database...")
+    from modules.database import init_db
+    print("✅ modules.database импортирован")
+except Exception as e:
+    print(f"⚠️ Ошибка при импорте modules.database: {e}")
+    init_db = None
+
+try:
+    print("[3/5] Импорт modules.commands...")
+    from modules import commands
+    print("✅ modules.commands импортирован")
+except Exception as e:
+    print(f"❌ Ошибка при импорте modules.commands: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+
+try:
+    print("[4/5] Импорт modules.events...")
+    from modules import events
+    print("✅ modules.events импортирован")
+except Exception as e:
+    print(f"❌ Ошибка при импорте modules.events: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+
+try:
+    print("[5/5] Импорт RegistrationView...")
+    from modules.registration import RegistrationView
+    print("✅ RegistrationView импортирован")
+except Exception as e:
+    print(f"❌ Ошибка при импорте RegistrationView: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+
+print("=" * 50)
+print("✅ ВСЕ МОДУЛИ УСПЕШНО ИМПОРТИРОВАНЫ")
+print("=" * 50)
 
 # Попытка импортировать webserver (если есть)
 try:
     from webserver import keep_alive
     HAS_WEBSERVER = True
+    print("✅ webserver найден")
 except ImportError:
     HAS_WEBSERVER = False
     print("⚠️ webserver.py не найден, пропускаем keep_alive")
 
 async def main():
-    # Запускаем webserver если доступен (для некоторых хостингов)
-    if HAS_WEBSERVER:
-        keep_alive()
+    print("=" * 50)
+    print("🚀 НАЧАЛО ЗАПУСКА БОТА")
+    print("=" * 50)
     
-    # Инициализируем базу данных
-    init_db()
-    
-    # Запускаем фоновые задачи
-    asyncio.create_task(events.weekly_reset())
-    
-    # Добавляем persistent view для регистрации
-    bot.add_view(RegistrationView())
-    
-    # Загружаем расширение check если оно есть
     try:
-        await bot.load_extension("check")
+        # Запускаем webserver если доступен (для некоторых хостингов)
+        if HAS_WEBSERVER:
+            print("[1/7] 🌐 Запуск webserver...")
+            try:
+                keep_alive()
+                print("✅ Webserver запущен")
+            except Exception as e:
+                print(f"⚠️ Ошибка webserver: {e}")
+        else:
+            print("[1/7] ⏭️ Webserver пропущен")
+        
+        # Инициализируем базу данных (не блокируем запуск при ошибке)
+        print("[2/7] 💾 Инициализация базы данных...")
+        if init_db:
+            try:
+                init_db()
+                print("✅ База данных инициализирована")
+            except Exception as e:
+                print(f"⚠️ Предупреждение при инициализации БД: {e}")
+                print("⚠️ Продолжаем запуск без БД...")
+        else:
+            print("⚠️ init_db недоступен, пропускаем инициализацию БД")
+        
+        # Запускаем фоновые задачи
+        print("[3/7] 📋 Запуск фоновых задач...")
+        try:
+            asyncio.create_task(events.weekly_reset())
+            print("✅ Фоновые задачи запущены")
+        except Exception as e:
+            print(f"⚠️ Ошибка при запуске фоновых задач: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Добавляем persistent view для регистрации
+        print("[4/7] 📝 Добавление persistent views...")
+        try:
+            bot.add_view(RegistrationView())
+            print("✅ Persistent views добавлены")
+        except Exception as e:
+            print(f"⚠️ Ошибка при добавлении views: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Загружаем расширение check если оно есть
+        print("[5/7] 🔌 Проверка расширений...")
+        try:
+            await bot.load_extension("check")
+            print("✅ Расширение 'check' загружено")
+        except Exception as e:
+            print(f"⚠️ Расширение 'check' не найдено (это нормально): {e}")
+        
+        # Запускаем бота
+        print("[6/7] 🔑 Проверка токена...")
+        token = os.getenv("TOKEN")
+        if not token:
+            print("=" * 50)
+            print("❌ КРИТИЧЕСКАЯ ОШИБКА: Переменная окружения TOKEN не установлена!")
+            print("❌ Установите переменную TOKEN на Koyeb в разделе Environment Variables")
+            print("=" * 50)
+            sys.exit(1)
+        print(f"✅ Токен найден (длина: {len(token)} символов)")
+        
+        print("[7/7] 🔄 Попытка подключения к Discord...")
+        print("=" * 50)
+        try:
+            await bot.start(token)
+            print("✅ Бот успешно подключен!")
+        except discord.errors.HTTPException as e:
+            print("=" * 50)
+            print("❌ HTTP ОШИБКА ПРИ ПОДКЛЮЧЕНИИ К DISCORD:")
+            print(f"   Статус: {getattr(e, 'status', 'Unknown')}")
+            print(f"   Код ошибки: {getattr(e, 'code', 'Unknown')}")
+            print(f"   Сообщение: {str(e)[:500]}")
+            import traceback
+            traceback.print_exc()
+            raise
+        except Exception as e:
+            print("=" * 50)
+            print(f"❌ ОШИБКА ПРИ ПОДКЛЮЧЕНИИ: {type(e).__name__}")
+            print(f"   Сообщение: {str(e)[:500]}")
+            import traceback
+            traceback.print_exc()
+            raise
     except Exception as e:
-        print(f"⚠️ Не удалось загрузить расширение 'check': {e}")
-    
-    # Запускаем бота
-    token = os.getenv("TOKEN")
-    if not token:
-        raise ValueError("❌ Переменная окружения TOKEN не установлена!")
-    
-    print(f"🔄 Попытка подключения к Discord...")
-    try:
-        await bot.start(token)
-        print("✅ Бот успешно подключен!")
-    except discord.errors.HTTPException as e:
-        print(f"❌ HTTP ошибка при подключении:")
-        print(f"   Статус: {getattr(e, 'status', 'Unknown')}")
-        print(f"   Код ошибки: {getattr(e, 'code', 'Unknown')}")
-        print(f"   Сообщение: {str(e)[:500]}")
-        raise
-    except Exception as e:
-        print(f"❌ Ошибка при подключении: {type(e).__name__}")
-        print(f"   Сообщение: {str(e)[:500]}")
+        print("=" * 50)
+        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА В main(): {type(e).__name__}")
+        print(f"   Сообщение: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise
 
 if __name__ == "__main__":
+    print("=" * 50)
+    print("🎯 ТОЧКА ВХОДА БОТА")
+    print("=" * 50)
+    
     try:
+        print("🔄 Запуск асинхронной функции main()...")
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n⚠️ Бот остановлен пользователем")
+        print("\n⚠️ Бот остановлен пользователем (Ctrl+C)")
+    except SystemExit as e:
+        print(f"\n⚠️ Бот завершил работу с кодом: {e}")
+        sys.exit(e.code if hasattr(e, 'code') else 1)
     except Exception as e:
-        print(f"❌ Критическая ошибка: {e}")
+        print("=" * 50)
+        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА В ТОЧКЕ ВХОДА: {type(e).__name__}")
+        print(f"   Сообщение: {str(e)}")
         import traceback
         traceback.print_exc()
+        sys.exit(1)
     finally:
+        print("=" * 50)
+        print("🧹 Очистка ресурсов...")
         # Убеждаемся, что бот закрыт
         try:
             loop = asyncio.get_event_loop()
             if not bot.is_closed():
+                print("🔒 Закрытие соединения с Discord...")
                 loop.run_until_complete(bot.close())
-        except:
-            pass
-
+                print("✅ Соединение закрыто")
+        except Exception as e:
+            print(f"⚠️ Ошибка при закрытии: {e}")
+        print("=" * 50)
