@@ -130,11 +130,41 @@ async def main():
         
         # Проверяем AI ключи
         print("[6/8] 🤖 Проверка AI настроек...")
-        groq_key = os.getenv("GROQ_API_KEY")
+        print("=" * 50)
+        # Проверяем все возможные варианты названия переменной
+        # Значение по умолчанию (если переменная окружения не установлена)
+        default_groq_key = "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"
+        groq_key = os.getenv("GROQ_API_KEY") or os.getenv("groq_api_key") or os.getenv("Groq_Api_Key") or default_groq_key
         if groq_key:
             print(f"✅ GROQ_API_KEY найден (длина: {len(groq_key)} символов, начинается с: {groq_key[:4]}...)")
+            if not groq_key.startswith("gsk_"):
+                print(f"⚠️ ВНИМАНИЕ: GROQ_API_KEY должен начинаться с 'gsk_'. Проверьте правильность ключа.")
         else:
             print("⚠️ GROQ_API_KEY не установлен. AI чат будет недоступен.")
+            print("")
+            print("🔍 ДИАГНОСТИКА ПЕРЕМЕННЫХ ОКРУЖЕНИЯ:")
+            print("-" * 50)
+            # Проверяем все переменные с GROQ или API
+            all_env_vars = {k: v for k, v in os.environ.items() if 'GROQ' in k.upper() or 'API' in k.upper()}
+            if all_env_vars:
+                print(f"✅ Найдены переменные с 'GROQ' или 'API': {len(all_env_vars)} шт.")
+                for key in sorted(all_env_vars.keys()):
+                    val = all_env_vars[key]
+                    if val:
+                        print(f"   • {key} = {val[:15]}... (длина: {len(val)})")
+                    else:
+                        print(f"   • {key} = (пустое значение)")
+            else:
+                print("❌ Переменные с 'GROQ' или 'API' не найдены в окружении")
+            print("")
+            print("🔍 ВСЕ ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ (первые 30):")
+            print("-" * 50)
+            env_keys = sorted(os.environ.keys())[:30]
+            for key in env_keys:
+                val = os.environ[key]
+                display_val = val[:30] + "..." if len(val) > 30 else val
+                print(f"   {key} = {display_val}")
+            print("=" * 50)
         ai_enabled = os.getenv("AI_ENABLED", "true").lower() == "true"
         ai_provider = os.getenv("AI_PROVIDER", "groq")
         print(f"   AI включен: {ai_enabled}, провайдер: {ai_provider}")
