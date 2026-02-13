@@ -136,9 +136,13 @@ async def send_registration(ctx):
     await ctx.send(embed=embed, view=view)
 
 @bot.command(name="form")
-async def form(ctx, member: discord.Member = None):
-    """Отправляет форму регистрации в личные сообщения указанному пользователю"""
+async def form(ctx, *, member_input: str = None):
+    """Отправляет форму регистрации в личные сообщения указанному пользователю
+    
+    Использование: !form @пользователь
+    """
     print(f"🔍 Команда !form вызвана пользователем {ctx.author.id} ({ctx.author.display_name})")
+    print(f"🔍 Аргументы команды: {member_input}")
     
     # Проверка ID автора - только определенный пользователь может использовать команду
     if ctx.author.id != AUTHORIZED_USER_ID:
@@ -147,9 +151,40 @@ async def form(ctx, member: discord.Member = None):
         return
     
     # Проверка наличия упоминания пользователя
-    if not member:
+    if not member_input:
         print(f"⚠️ Пользователь не указан в команде")
         await ctx.send("❌ Укажите пользователя для отправки формы. Использование: `!form @пользователь`")
+        return
+    
+    # Парсим упоминание пользователя
+    member = None
+    
+    # Пытаемся найти пользователя по упоминанию
+    if ctx.message.mentions:
+        member = ctx.message.mentions[0]
+        print(f"🔍 Найден пользователь по упоминанию: {member.id} ({member.display_name})")
+    else:
+        # Пытаемся найти по ID или имени
+        try:
+            # Пытаемся найти по ID
+            if member_input.isdigit():
+                member = ctx.guild.get_member(int(member_input))
+                if member:
+                    print(f"🔍 Найден пользователь по ID: {member.id} ({member.display_name})")
+        except:
+            pass
+        
+        # Если не нашли по ID, пытаемся найти по имени
+        if not member:
+            member = discord.utils.get(ctx.guild.members, name=member_input) or \
+                     discord.utils.get(ctx.guild.members, display_name=member_input) or \
+                     discord.utils.get(ctx.guild.members, nick=member_input)
+            if member:
+                print(f"🔍 Найден пользователь по имени: {member.id} ({member.display_name})")
+    
+    if not member:
+        print(f"❌ Пользователь не найден: {member_input}")
+        await ctx.send(f"❌ Пользователь '{member_input}' не найден на сервере. Используйте упоминание: `!form @пользователь`")
         return
     
     print(f"📤 Попытка отправить форму регистрации пользователю {member.id} ({member.display_name})")
@@ -263,8 +298,10 @@ async def rebind(ctx, nickname: str = None):
         except Exception as e:
             print(f"❌ Ошибка при изменении никнейма: {e}")
         
-        # Обновляем роль
-        role = ctx.guild.get_role(CLAN_ROLE_ID)
+        # Обновляем роль - читаем значение заново из переменной окружения
+        from modules.registration import get_clan_role_id
+        current_role_id = get_clan_role_id()
+        role = ctx.guild.get_role(current_role_id)
         if role:
             if role not in ctx.author.roles:
                 await ctx.author.add_roles(role)
