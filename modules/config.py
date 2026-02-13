@@ -6,7 +6,7 @@ from discord.ext import commands
 # PUBG API
 PUBG_API_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJjZmMyNDMyMC01NzZlLTAxM2UtMjAyNS0yYTI4ZjY0MjU0ZDEiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzU0NzU4MTk5LCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InhsczIifQ.C74qapztROZBtCVEWdob2w4B0-omdLJ-aaBfdfFK91E"
 PUBG_PLATFORM = "steam"
-print("PUBG API key:", repr(PUBG_API_KEY))
+# print("PUBG API key:", repr(PUBG_API_KEY))  # Отключено для безопасности
 
 # Discord Intents
 intents = discord.Intents.default()
@@ -60,8 +60,9 @@ AI_PROVIDER = os.getenv("AI_PROVIDER", "groq")  # groq, huggingface, openrouter
 AI_ENABLED = os.getenv("AI_ENABLED", "true").lower() == "true"  # Включен ли AI чат
 
 # FFmpeg setup (только для Linux/Mac, на Windows пропускается)
-try:
-    subprocess.run(["chmod", "+x", "./ffmpeg"], check=False)
-except:
-    pass  # Игнорируем ошибку на Windows
+# Отключено для ускорения запуска - выполняется асинхронно при необходимости
+# try:
+#     subprocess.run(["chmod", "+x", "./ffmpeg"], check=False, timeout=1)
+# except:
+#     pass  # Игнорируем ошибку
 
