@@ -43,11 +43,18 @@ async def chat_with_groq(
     Returns:
         Ответ модели или None в случае ошибки
     """
-    api_key = api_key or os.getenv("GROQ_API_KEY")
+    # Проверяем все возможные варианты названия переменной
+    # Значение по умолчанию (если переменная окружения не установлена)
+    default_key = "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"
+    api_key = api_key or os.getenv("GROQ_API_KEY") or os.getenv("groq_api_key") or os.getenv("Groq_Api_Key") or default_key
     
     if not api_key:
         print("⚠️ GROQ_API_KEY не установлен. Получите ключ на https://console.groq.com/")
         print(f"🔍 Проверка переменных окружения: GROQ_API_KEY = {os.getenv('GROQ_API_KEY', 'НЕ НАЙДЕН')}")
+        # Дополнительная диагностика
+        all_groq_vars = {k: v for k, v in os.environ.items() if 'GROQ' in k.upper()}
+        if all_groq_vars:
+            print(f"🔍 Найдены переменные с 'GROQ': {list(all_groq_vars.keys())}")
         return None
     
     # Проверяем формат ключа
