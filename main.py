@@ -29,7 +29,7 @@ except Exception as e:
 
 try:
     print("[3/5] Импорт modules.commands...")
-    from modules import commands
+    import modules.commands  # Используем import вместо from import для избежания конфликтов
     print("✅ modules.commands импортирован")
 except Exception as e:
     print(f"❌ КРИТИЧЕСКАЯ ОШИБКА при импорте modules.commands: {e}")
@@ -39,7 +39,7 @@ except Exception as e:
 
 try:
     print("[4/5] Импорт modules.events...")
-    from modules import events
+    import modules.events  # Используем import вместо from import для избежания конфликтов
     print("✅ modules.events импортирован")
 except Exception as e:
     print(f"❌ КРИТИЧЕСКАЯ ОШИБКА при импорте modules.events: {e}")
@@ -102,7 +102,8 @@ async def main():
         # Запускаем фоновые задачи
         print("[3/7] 📋 Запуск фоновых задач...")
         try:
-            asyncio.create_task(events.weekly_reset())
+            import modules.events as events_module
+            asyncio.create_task(events_module.weekly_reset())
             print("✅ Фоновые задачи запущены")
         except Exception as e:
             print(f"⚠️ Ошибка при запуске фоновых задач: {e}")
