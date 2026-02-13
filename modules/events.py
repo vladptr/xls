@@ -40,11 +40,36 @@ async def reset_channel_permissions(channel, owner_id):
         # Устанавливаем права для владельца
         owner = channel.guild.get_member(owner_id)
         if owner:
+            # Сначала отключаем move_members для всех ролей владельца на этом канале
+            for role in owner.roles:
+                if role != channel.guild.default_role:  # Пропускаем @everyone, он уже обработан выше
+                    role_overwrite = channel.overwrites_for(role)
+                    role_overwrite.move_members = False  # Явно отключаем отключение участников для ролей
+                    try:
+                        await channel.set_permissions(role, overwrite=role_overwrite)
+                    except Exception as e:
+                        print(f"⚠️ Не удалось установить права для роли {role.name}: {e}")
+            
+            # Теперь устанавливаем права для самого владельца
             owner_overwrite = channel.overwrites_for(owner)
-            owner_overwrite.manage_channels = True  # Управление каналом (включая редактирование доступа по ролям)
-            owner_overwrite.move_members = False    # Убрано: отключение игроков
-            owner_overwrite.connect = True          # Подключение к каналу
+            # Явно устанавливаем все права для владельца
+            owner_overwrite.manage_channels = True   # Управление каналом (включая редактирование доступа по ролям)
+            owner_overwrite.move_members = False     # ЯВНО ОТКЛЮЧЕНО: отключение игроков
+            owner_overwrite.mute_members = False     # Отключено: муты участников
+            owner_overwrite.deafen_members = False   # Отключено: отключение звука участников
+            owner_overwrite.connect = True           # Подключение к каналу
+            owner_overwrite.speak = True             # Возможность говорить
+            owner_overwrite.view_channel = True       # Просмотр канала
+            
+            # Явно устанавливаем overwrite, чтобы перезаписать любые права от ролей
             await channel.set_permissions(owner, overwrite=owner_overwrite)
+            
+            # Проверяем, что права действительно установлены
+            final_overwrite = channel.overwrites_for(owner)
+            if final_overwrite.move_members is not False:
+                print(f"⚠️ ВНИМАНИЕ: move_members для владельца не установлен в False! Текущее значение: {final_overwrite.move_members}")
+            else:
+                print(f"✅ Установлены права для владельца канала {owner.display_name}: manage_channels=True, move_members=False")
         
         # Устанавливаем права для администратора (если он на сервере)
         admin = channel.guild.get_member(ADMIN_USER_ID)
