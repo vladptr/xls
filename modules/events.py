@@ -2,7 +2,7 @@ import discord
 import asyncio
 import random
 from datetime import datetime, timezone, timedelta
-from modules.config import bot, BLACKLISTED_CHANNELS, TRIGGER_CHANNELS, MAIN_GUILD_ID
+from modules.config import bot, BLACKLISTED_CHANNELS, TRIGGER_CHANNELS
 from modules.database import supabase
 from modules.voice_channels import (
     setup_messages, channel_locks, room_modes, created_channels, 
@@ -41,9 +41,9 @@ async def reset_channel_permissions(channel, owner_id):
         owner = channel.guild.get_member(owner_id)
         if owner:
             owner_overwrite = channel.overwrites_for(owner)
-            owner_overwrite.manage_channels = True
-            owner_overwrite.move_members = False
-            owner_overwrite.connect = True
+            owner_overwrite.manage_channels = True  # Управление каналом (включая редактирование доступа по ролям)
+            owner_overwrite.move_members = False    # Убрано: отключение игроков
+            owner_overwrite.connect = True          # Подключение к каналу
             await channel.set_permissions(owner, overwrite=owner_overwrite)
         
         # Устанавливаем права для администратора (если он на сервере)
@@ -98,14 +98,65 @@ async def on_ready():
     print(f"Bot ready! Logged in as {bot.user}")
     print("✅ Система регистрации и проверки клана активирована")
 
+async def cleanup_user_data(user_id: int, guild: discord.Guild):
+    """Удаляет все данные пользователя из базы данных"""
+    try:
+        # Проверяем, действительно ли пользователь покинул сервер
+        member = guild.get_member(user_id)
+        if member:
+            # Пользователь все еще на сервере, не удаляем
+            return False
+        
+        # Удаляем данные из всех таблиц
+        deleted_count = 0
+        
+        # 1. Удаляем регистрацию
+        try:
+            supabase.table("user_registrations").delete().eq("discord_id", str(user_id)).execute()
+            deleted_count += 1
+        except Exception as e:
+            print(f"⚠️ Ошибка при удалении регистрации для {user_id}: {e}")
+        
+        # 2. Удаляем статистику времени в голосовых
+        try:
+            supabase.table("voice_time").delete().eq("user_id", user_id).execute()
+            deleted_count += 1
+        except Exception as e:
+            print(f"⚠️ Ошибка при удалении voice_time для {user_id}: {e}")
+        
+        # 3. Удаляем уровни и опыт
+        try:
+            supabase.table("user_levels").delete().eq("user_id", user_id).execute()
+            deleted_count += 1
+        except Exception as e:
+            print(f"⚠️ Ошибка при удалении user_levels для {user_id}: {e}")
+        
+        # 4. Удаляем активные сессии голосовых каналов
+        try:
+            supabase.table("voice_sessions").delete().eq("user_id", user_id).execute()
+            deleted_count += 1
+        except Exception as e:
+            print(f"⚠️ Ошибка при удалении voice_sessions для {user_id}: {e}")
+        
+        # Примечание: weekly_voice_stats не удаляем, чтобы сохранить историю
+        
+        if deleted_count > 0:
+            print(f"🗑️ Удалены данные пользователя {user_id} из {deleted_count} таблиц")
+            return True
+        return False
+        
+    except Exception as e:
+        print(f"❌ Ошибка при очистке данных пользователя {user_id}: {e}")
+        return False
+
 @bot.event
 async def on_member_remove(member):
     """Удаляет запись пользователя из базы при выходе с сервера"""
     try:
-        supabase.table("user_registrations").delete().eq("discord_id", member.id).execute()
-        print(f"🗑️ Удалена регистрация пользователя {member.display_name} ({member.id})")
+        await cleanup_user_data(member.id, member.guild)
+        print(f"🗑️ Обработан выход пользователя {member.display_name} ({member.id})")
     except Exception as e:
-        print(f"❌ Ошибка при удалении регистрации пользователя {member.id}: {e}")
+        print(f"❌ Ошибка при обработке выхода пользователя {member.id}: {e}")
 
 @bot.event
 async def on_member_join(member):
@@ -338,6 +389,71 @@ async def on_voice_state_update(member, before, after):
         msg = await new_channel.send(f"{member.mention}, настройте комнату:", view=view)
         setup_messages[new_channel.id] = msg
 
+async def check_and_cleanup_left_users():
+    """Проверяет всех пользователей в базе и удаляет данные тех, кто покинул сервер"""
+    try:
+        guilds = bot.guilds
+        if not guilds:
+            print("⚠️ Бот не подключен ни к одному серверу")
+            return
+        
+        # Используем первый сервер
+        guild = guilds[0]
+        
+        # Получаем всех пользователей из базы
+        all_user_ids = set()
+        
+        # Из user_registrations
+        try:
+            registrations = supabase.table("user_registrations").select("discord_id").execute()
+            if registrations.data:
+                for reg in registrations.data:
+                    discord_id = reg.get("discord_id")
+                    if discord_id:
+                        all_user_ids.add(int(discord_id))
+        except Exception as e:
+            print(f"⚠️ Ошибка при получении user_registrations: {e}")
+        
+        # Из voice_time
+        try:
+            voice_time_users = supabase.table("voice_time").select("user_id").execute()
+            if voice_time_users.data:
+                for vt in voice_time_users.data:
+                    all_user_ids.add(int(vt.get("user_id")))
+        except Exception as e:
+            print(f"⚠️ Ошибка при получении voice_time: {e}")
+        
+        # Из user_levels
+        try:
+            level_users = supabase.table("user_levels").select("user_id").execute()
+            if level_users.data:
+                for lu in level_users.data:
+                    all_user_ids.add(int(lu.get("user_id")))
+        except Exception as e:
+            print(f"⚠️ Ошибка при получении user_levels: {e}")
+        
+        # Проверяем каждого пользователя
+        cleaned_count = 0
+        for user_id in all_user_ids:
+            try:
+                member = guild.get_member(user_id)
+                if not member:
+                    # Пользователь не на сервере - удаляем данные
+                    if await cleanup_user_data(user_id, guild):
+                        cleaned_count += 1
+            except Exception as e:
+                print(f"⚠️ Ошибка при проверке пользователя {user_id}: {e}")
+        
+        if cleaned_count > 0:
+            print(f"🧹 Очищены данные {cleaned_count} пользователей, которые покинули сервер")
+        else:
+            print(f"✅ Все пользователи в базе присутствуют на сервере")
+            
+    except Exception as e:
+        print(f"❌ Ошибка при проверке пользователей на сервере: {e}")
+        import traceback
+        traceback.print_exc()
+
 async def clan_verification_check():
     """Проверяет всех участников с ролью клана каждые 3 часа"""
     from modules.registration import check_all_members_in_clan
@@ -346,16 +462,22 @@ async def clan_verification_check():
         await asyncio.sleep(10800)  # 3 часа = 10800 секунд
         
         try:
-            # Получаем основную гильдию по ID (если бот на нескольких серверах)
+            # Получаем первую гильдию бота
             guilds = bot.guilds
             if guilds:
-                guild = discord.utils.get(guilds, id=MAIN_GUILD_ID) or guilds[0]
+                guild = guilds[0]
                 print(f"🔄 Запуск проверки участников клана на сервере {guild.id}...")
                 await check_all_members_in_clan(guild)
+                
+                # Также проверяем и очищаем данные пользователей, которые покинули сервер
+                print(f"🧹 Проверка пользователей на наличие на сервере...")
+                await check_and_cleanup_left_users()
             else:
                 print("⚠️ Бот не подключен ни к одному серверу")
         except Exception as e:
             print(f"❌ Ошибка в задаче проверки клана: {e}")
+            import traceback
+            traceback.print_exc()
 
 async def weekly_reset():
     while True:
@@ -382,15 +504,23 @@ async def weekly_reset():
             voice_time_rows = supabase.table("voice_time").select("user_id", "total_seconds").execute()
 
             user_times = []
+            # Получаем всех пользователей, которые когда-либо были в голосовых каналах
+            all_users_with_stats = supabase.table("weekly_voice_stats").select("user_id").execute()
+            all_user_ids = set()
+            if all_users_with_stats.data:
+                all_user_ids = {record["user_id"] for record in all_users_with_stats.data}
+            
+            # Добавляем пользователей из текущей недели
             for record in voice_time_rows.data:
                 user_id = record["user_id"]
                 total_seconds = record["total_seconds"]
+                all_user_ids.add(user_id)
                 user_times.append((user_id, total_seconds))
 
-            # Сортируем по времени
+            # Сортируем по времени (только тех, кто был активен на этой неделе)
             user_times.sort(key=lambda x: x[1], reverse=True)
 
-            # Начисление опыта
+            # Начисление опыта только для активных пользователей
             for i, (user_id, total_seconds) in enumerate(user_times):
                 if total_seconds < 60:  # меньше минуты - без опыта
                     continue
@@ -417,12 +547,26 @@ async def weekly_reset():
                     "total_seconds": total_seconds
                 }).execute()
 
-            # Очищаем voice_time
-            supabase.table("voice_time").update({"total_seconds": 0}).neq("user_id", -1).execute()
+            # Сохраняем записи с 0 часов для всех пользователей, которые были активны ранее, но не на этой неделе
+            for user_id in all_user_ids:
+                # Проверяем, есть ли уже запись для этого пользователя на этой неделе
+                existing_week = supabase.table("weekly_voice_stats").select("*").eq("user_id", user_id).eq("cycle_number", cycle_number).eq("week_number", max_week_number + 1).execute()
+                if not existing_week.data:
+                    # Создаем запись с 0 часов для правильного расчета среднего
+                    supabase.table("weekly_voice_stats").insert({
+                        "cycle_number": cycle_number,
+                        "week_number": max_week_number + 1,
+                        "user_id": user_id,
+                        "total_seconds": 0
+                    }).execute()
+
+            # Обнуляем voice_time только для пользователей, у которых есть записи
+            for record in voice_time_rows.data:
+                user_id = record["user_id"]
+                supabase.table("voice_time").update({"total_seconds": 0}).eq("user_id", user_id).execute()
 
             print("📅 Статистика по времени в голосовых сброшена!")
 
         except Exception as e:
             print(f"❌ Ошибка при сбросе статистики: {e}")
-
 
