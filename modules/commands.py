@@ -9,6 +9,7 @@ from modules.registration import RegistrationView, REGISTRATION_CHANNEL_ID
 from modules.ai_chat import chat
 from modules.ai_chat import chat
 
+
 @bot.command(name="clearmsg")
 @commands.has_permissions(manage_messages=False)
 async def clear_bot_messages(ctx):
@@ -373,4 +374,5 @@ async def chat_command(ctx, *, message: str = None):
     except Exception as e:
         await loading_msg.edit(content=f"❌ Ошибка при обращении к AI: {e}")
         print(f"❌ Ошибка в команде chat: {e}")
+
 
