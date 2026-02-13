@@ -118,17 +118,34 @@ async def stat(ctx, member: discord.Member = None):
 
         total_hours = total_seconds_all_time / 3600.0
 
-        weeks_rows = supabase.table("weekly_voice_stats").select("cycle_number,week_number").eq("user_id", user_id).execute()
-        if weeks_rows.data:
-            weeks_set = {(r.get("cycle_number"), r.get("week_number")) for r in weeks_rows.data}
-            weeks_count = len(weeks_set)
-        else:
-            weeks_count = 0
-
-        if weeks_count <= 0:
+        # Получаем все недели пользователя для правильного расчета среднего
+        weeks_rows = supabase.table("weekly_voice_stats").select("cycle_number,week_number,total_seconds").eq("user_id", user_id).order("cycle_number").order("week_number").execute()
+        
+        if not weeks_rows.data:
             avg_hours = 0.0
         else:
-            avg_hours = total_hours / weeks_count
+            # Суммируем все секунды из истории недель
+            total_seconds_in_history = sum([week.get("total_seconds", 0) for week in weeks_rows.data])
+            
+            # Количество недель = количество записей (включая недели с 0 часов)
+            weeks_count = len(weeks_rows.data)
+            
+            # Среднее время = сумма всех недель / количество недель
+            avg_hours = (total_seconds_in_history / 3600.0) / weeks_count if weeks_count > 0 else 0.0
+            
+            # Находим первую неделю пользователя (для отображения)
+            first_week = weeks_rows.data[0]
+            first_cycle = first_week.get("cycle_number", 0)
+            first_week_num = first_week.get("week_number", 0)
+            
+            # Находим текущую неделю (последнюю запись) для отображения
+            last_week = weeks_rows.data[-1]
+            current_cycle = last_week.get("cycle_number", 0)
+            current_week_num = last_week.get("week_number", 0)
+            
+            # avg_hours уже рассчитан выше правильно:
+            # сумма всех недель (включая 0 часов) / количество записей недель
+            # Это учитывает все недели с момента первой активности пользователя
          
         # Выбор фона по уровню
         if level <= 5:
