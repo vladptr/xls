@@ -28,21 +28,21 @@ except Exception as e:
     init_db = None
 
 try:
-    print("[3/5] Импорт modules.commands...")
-    import modules.commands  # Используем import вместо from import для избежания конфликтов
-    print("✅ modules.commands импортирован")
+    print("[3/5] Импорт modules.events...")
+    import modules.events  # Импортируем events ПЕРЕД commands, чтобы избежать конфликтов
+    print("✅ modules.events импортирован")
 except Exception as e:
-    print(f"❌ КРИТИЧЕСКАЯ ОШИБКА при импорте modules.commands: {e}")
+    print(f"❌ КРИТИЧЕСКАЯ ОШИБКА при импорте modules.events: {e}")
     import traceback
     traceback.print_exc()
     raise
 
 try:
-    print("[4/5] Импорт modules.events...")
-    import modules.events  # Используем import вместо from import для избежания конфликтов
-    print("✅ modules.events импортирован")
+    print("[4/5] Импорт modules.commands...")
+    import modules.commands  # Импортируем commands ПОСЛЕ events
+    print("✅ modules.commands импортирован")
 except Exception as e:
-    print(f"❌ КРИТИЧЕСКАЯ ОШИБКА при импорте modules.events: {e}")
+    print(f"❌ КРИТИЧЕСКАЯ ОШИБКА при импорте modules.commands: {e}")
     import traceback
     traceback.print_exc()
     raise
@@ -128,8 +128,19 @@ async def main():
         except Exception as e:
             print(f"⚠️ Расширение 'check' не найдено (это нормально): {e}")
         
+        # Проверяем AI ключи
+        print("[6/8] 🤖 Проверка AI настроек...")
+        groq_key = os.getenv("GROQ_API_KEY")
+        if groq_key:
+            print(f"✅ GROQ_API_KEY найден (длина: {len(groq_key)} символов, начинается с: {groq_key[:4]}...)")
+        else:
+            print("⚠️ GROQ_API_KEY не установлен. AI чат будет недоступен.")
+        ai_enabled = os.getenv("AI_ENABLED", "true").lower() == "true"
+        ai_provider = os.getenv("AI_PROVIDER", "groq")
+        print(f"   AI включен: {ai_enabled}, провайдер: {ai_provider}")
+        
         # Запускаем бота
-        print("[6/7] 🔑 Проверка токена...")
+        print("[7/8] 🔑 Проверка токена...")
         token = os.getenv("TOKEN")
         if not token:
             print("=" * 50)
@@ -139,7 +150,7 @@ async def main():
             sys.exit(1)
         print(f"✅ Токен найден (длина: {len(token)} символов)")
         
-        print("[7/7] 🔄 Попытка подключения к Discord...")
+        print("[8/8] 🔄 Попытка подключения к Discord...")
         print("=" * 50)
         try:
             await bot.start(token)
