@@ -1,194 +1,197 @@
 import discord
-import asyncio
-import random
-from datetime import datetime, timezone, timedelta
-from modules.config import bot, BLACKLISTED_CHANNELS, TRIGGER_CHANNELS, MAIN_GUILD_ID, AI_SYSTEM_PROMPT, AI_PROVIDER, AI_ENABLED
+from discord.ext import commands
+from modules.config import bot, AUTHORIZED_USER_ID, AI_SYSTEM_PROMPT, AI_PROVIDER, AI_ENABLED
 from modules.database import supabase
-from modules.voice_channels import (
-    setup_messages, channel_locks, room_modes, created_channels, 
-    channel_bases, get_channel_lock, RoomSetupView
-)
 from modules.leveling import update_experience
+from modules.pubg_stats import stat as pubg_stat
+from modules.leaderboard import leaderboard as leaderboard_func
+from modules.registration import RegistrationView, REGISTRATION_CHANNEL_ID
+from modules.ai_chat import chat
 
-stat_queue = asyncio.Queue()
-pending_stats = set()
-voice_stat_messages = {}
+@bot.command(name="clearmsg")
+@commands.has_permissions(manage_messages=False)
+async def clear_bot_messages(ctx):
+    """Удаляет все сообщения от бота в текущем канале."""
+    deleted = 0
+    async for message in ctx.channel.history(limit=1000):  # Увеличь лимит при необходимости
+        if message.author == bot.user:
+            try:
+                await message.delete()
+                deleted += 1
+            except discord.Forbidden:
+                await ctx.send("❌ У меня нет прав на удаление сообщений.")
+                return
+            except discord.HTTPException:
+                continue  # Иногда Discord не позволяет удалить старые сообщения
 
-ADMIN_USER_ID = 455023858463014922
+    await ctx.send(f"🧹 Удалено {deleted} сообщений от бота.", delete_after=5)
 
-async def reset_channel_permissions(channel, owner_id):
-    """Сбрасывает права для всех участников канала, кроме владельца и администратора"""
-    try:
-        # Убеждаемся, что @everyone не имеет прав на управление каналом
-        everyone_overwrite = channel.overwrites_for(channel.guild.default_role)
-        everyone_overwrite.manage_channels = False
-        everyone_overwrite.move_members = False
-        everyone_overwrite.mute_members = False
-        everyone_overwrite.deafen_members = False
-        await channel.set_permissions(channel.guild.default_role, overwrite=everyone_overwrite)
-        
-        # Сбрасываем права для всех участников канала, кроме владельца и администратора
-        for member in channel.members:
-            if member.id != owner_id and member.id != ADMIN_USER_ID:
-                member_overwrite = channel.overwrites_for(member)
-                member_overwrite.manage_channels = False
-                member_overwrite.move_members = False
-                member_overwrite.mute_members = False
-                member_overwrite.deafen_members = False
-                await channel.set_permissions(member, overwrite=member_overwrite)
-        
-        # Устанавливаем права для владельца
-        owner = channel.guild.get_member(owner_id)
-        if owner:
-            # Сначала отключаем move_members для всех ролей владельца на этом канале
-            for role in owner.roles:
-                if role != channel.guild.default_role:  # Пропускаем @everyone, он уже обработан выше
-                    role_overwrite = channel.overwrites_for(role)
-                    role_overwrite.move_members = False  # Явно отключаем отключение участников для ролей
-                    try:
-                        await channel.set_permissions(role, overwrite=role_overwrite)
-                    except Exception as e:
-                        print(f"⚠️ Не удалось установить права для роли {role.name}: {e}")
-            
-            # Теперь устанавливаем права для самого владельца
-            owner_overwrite = channel.overwrites_for(owner)
-            # Явно устанавливаем все права для владельца
-            owner_overwrite.manage_channels = True   # Управление каналом (включая редактирование доступа по ролям)
-            owner_overwrite.move_members = False     # ЯВНО ОТКЛЮЧЕНО: отключение игроков
-            owner_overwrite.mute_members = False     # Отключено: муты участников
-            owner_overwrite.deafen_members = False   # Отключено: отключение звука участников
-            owner_overwrite.connect = True           # Подключение к каналу
-            owner_overwrite.speak = True             # Возможность говорить
-            owner_overwrite.view_channel = True       # Просмотр канала
-            
-            # Явно устанавливаем overwrite, чтобы перезаписать любые права от ролей
-            await channel.set_permissions(owner, overwrite=owner_overwrite)
-            
-            # Проверяем, что права действительно установлены
-            final_overwrite = channel.overwrites_for(owner)
-            if final_overwrite.move_members is not False:
-                print(f"⚠️ ВНИМАНИЕ: move_members для владельца не установлен в False! Текущее значение: {final_overwrite.move_members}")
-            else:
-                print(f"✅ Установлены права для владельца канала {owner.display_name}: manage_channels=True, move_members=False")
-        
-        # Устанавливаем права для администратора (если он на сервере)
-        admin = channel.guild.get_member(ADMIN_USER_ID)
-        if admin:
-            admin_overwrite = channel.overwrites_for(admin)
-            admin_overwrite.manage_channels = True
-            admin_overwrite.move_members = True
-            admin_overwrite.mute_members = True
-            admin_overwrite.deafen_members = True
-            admin_overwrite.connect = True
-            await channel.set_permissions(admin, overwrite=admin_overwrite)
-    except Exception as e:
-        print(f"❌ Ошибка при сбросе прав канала: {e}")
+@bot.command()
+async def gonki(ctx):
+    await ctx.send("поехали! я беру гоночную каляску ♿")
 
-async def enqueue_stat(member, channel):
+@commands.cooldown(1, 60, commands.BucketType.user)
+@bot.command()
+async def leaderboard(ctx):
+    await leaderboard_func(ctx)
+
+@bot.command()
+async def stat(ctx, member: discord.Member = None):
+    await pubg_stat(ctx, member)
+
+@bot.command()
+async def setexp(ctx, member: discord.Member = None):
+    # Проверка ID автора
+    if ctx.author.id != AUTHORIZED_USER_ID:
+        await ctx.send("❌ У вас нет прав на использование этой команды.")
+        return
+
+    # Если не указали пользователя, по умолчанию автор
+    member = member or ctx.author
     user_id = member.id
-    if user_id in pending_stats:
-        return  # уже стоит в очереди, не добавляем
-    pending_stats.add(user_id)
-    await stat_queue.put((member, channel))
 
-async def stat_worker():
-    while True:
-        member, channel = await stat_queue.get()
-        member_id = member.id
-        
-        if member_id not in pending_stats:
-            continue
-        
-        try:
-            if channel.id in BLACKLISTED_CHANNELS:
-                continue  # пропускаем каналы из черного списка
-
-            temp_msg = await channel.send(".")
-            ctx = await bot.get_context(temp_msg)
-            command = bot.get_command("stat")
-            stat_msg = await command.callback(ctx, member=member)
-            if stat_msg:
-                voice_stat_messages[member.id] = stat_msg
-            await temp_msg.delete()
-        except Exception as e:
-            print(f"❌ Ошибка при отправке статистики: {e}")
-        finally:
-            pending_stats.discard(member.id)  # снимаем блокировку после отправки
-            await asyncio.sleep(30)
-
-@bot.event
-async def on_ready():
-    bot.loop.create_task(stat_worker())
-    bot.loop.create_task(clan_verification_check())
-    print(f"Bot ready! Logged in as {bot.user}")
-    print("✅ Система регистрации и проверки клана активирована")
-
-async def cleanup_user_data(user_id: int, guild: discord.Guild):
-    """Удаляет все данные пользователя из базы данных"""
     try:
-        # Проверяем, действительно ли пользователь покинул сервер
-        member = guild.get_member(user_id)
-        if member:
-            # Пользователь все еще на сервере, не удаляем
-            return False
-        
-        # Удаляем данные из всех таблиц
-        deleted_count = 0
-        
-        # 1. Удаляем регистрацию
-        try:
-            supabase.table("user_registrations").delete().eq("discord_id", str(user_id)).execute()
-            deleted_count += 1
-        except Exception as e:
-            print(f"⚠️ Ошибка при удалении регистрации для {user_id}: {e}")
-        
-        # 2. Удаляем статистику времени в голосовых
-        try:
-            supabase.table("voice_time").delete().eq("user_id", user_id).execute()
-            deleted_count += 1
-        except Exception as e:
-            print(f"⚠️ Ошибка при удалении voice_time для {user_id}: {e}")
-        
-        # 3. Удаляем уровни и опыт
-        try:
-            supabase.table("user_levels").delete().eq("user_id", user_id).execute()
-            deleted_count += 1
-        except Exception as e:
-            print(f"⚠️ Ошибка при удалении user_levels для {user_id}: {e}")
-        
-        # 4. Удаляем активные сессии голосовых каналов
-        try:
-            supabase.table("voice_sessions").delete().eq("user_id", user_id).execute()
-            deleted_count += 1
-        except Exception as e:
-            print(f"⚠️ Ошибка при удалении voice_sessions для {user_id}: {e}")
-        
-        # Примечание: weekly_voice_stats не удаляем, чтобы сохранить историю
-        
-        if deleted_count > 0:
-            print(f"🗑️ Удалены данные пользователя {user_id} из {deleted_count} таблиц")
-            return True
-        return False
-        
+        # Добавляем опыт
+        update_experience(user_id, 10)
+        await ctx.send(f"✅ Пользователю {member.display_name} начислено +10 опыта!")
     except Exception as e:
-        print(f"❌ Ошибка при очистке данных пользователя {user_id}: {e}")
-        return False
+        await ctx.send(f"❌ Ошибка при начислении опыта: {e}")
 
-@bot.event
-async def on_member_remove(member):
-    """Удаляет запись пользователя из базы при выходе с сервера"""
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def resetstat(ctx, member: discord.Member):
     try:
-        await cleanup_user_data(member.id, member.guild)
-        print(f"🗑️ Обработан выход пользователя {member.display_name} ({member.id})")
-    except Exception as e:
-        print(f"❌ Ошибка при обработке выхода пользователя {member.id}: {e}")
+        user_id = member.id
 
-@bot.event
-async def on_member_join(member):
-    from modules.registration import RegistrationView
+        # Обнуляем опыт
+        supabase.table("user_levels").upsert({"user_id": user_id, "exp": 0}).execute()
+        await ctx.send(f"🔁 Статистика пользователя {member.mention} сброшена.")
+
+    except Exception as e:
+        await ctx.send(f"❌ Ошибка при сбросе: {e}")
+
+@bot.command()
+async def generatestat(ctx):
+    if ctx.author.id != AUTHORIZED_USER_ID:
+        await ctx.send("❌ У вас нет прав на выполнение этой команды.")
+        return
+
+    try:
+        print("🔄 Ручной сброс статистики запущен...")
+
+        # Получаем текущий cycle_number
+        row = supabase.table("weekly_voice_stats").select("cycle_number").order("cycle_number", desc=True).limit(1).execute()
+        cycle_number = row.data[0]["cycle_number"] if row.data else 0
+
+        # Подсчет недель в текущем цикле
+        week_data = supabase.table("weekly_voice_stats") \
+            .select("week_number") \
+            .eq("cycle_number", cycle_number) \
+            .order("week_number", desc=True) \
+            .limit(1) \
+            .execute()
+
+        max_week_number = week_data.data[0]["week_number"] if week_data.data else 0
+
+        if max_week_number >= 12:
+            cycle_number += 1
+            max_week_number = 0
+
+        # Получаем данные voice_time
+        voice_time_rows = supabase.table("voice_time").select("user_id", "total_seconds").execute()
+        for record in voice_time_rows.data:
+            user_id = record["user_id"]
+            total_seconds = record["total_seconds"]
+            supabase.table("weekly_voice_stats").insert({
+                "cycle_number": cycle_number,
+                "week_number": max_week_number + 1,
+                "user_id": user_id,
+                "total_seconds": total_seconds
+            }).execute()
+
+        # Обнуляем voice_time
+        supabase.table("voice_time").update({"total_seconds": 0}).neq("user_id", -1).execute()
+
+        await ctx.send("📊 Статистика сброшена!")
+
+    except Exception as e:
+        await ctx.send(f"❌ Ошибка при сбросе статистики: {e}")
+        print(f"❌ Ошибка в команде generatestat: {e}")
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def send_registration(ctx):
+    """Отправляет форму регистрации в канал"""
+    embed = discord.Embed(
+        title="Регистрация в клане 🎮",
+        description="Для получения доступа к серверу необходимо зарегистрироваться в клане.\nНажмите кнопку **Логин** ниже, чтобы заполнить форму регистрации.",
+        color=discord.Color.blue()
+    )
+    embed.add_field(
+        name="Информация",
+        value="После заполнения формы бот проверит наличие вашего игрока в клане и выдаст соответствующую роль.",
+        inline=False
+    )
+    
+    view = RegistrationView()
+    await ctx.send(embed=embed, view=view)
+
+@bot.command(name="form")
+async def form(ctx, *, member_input: str = None):
+    """Отправляет форму регистрации в личные сообщения указанному пользователю
+    
+    Использование: !form @пользователь
+    """
+    print(f"🔍 Команда !form вызвана пользователем {ctx.author.id} ({ctx.author.display_name})")
+    print(f"🔍 Аргументы команды: {member_input}")
+    
+    # Проверка ID автора - только определенный пользователь может использовать команду
+    if ctx.author.id != AUTHORIZED_USER_ID:
+        print(f"❌ Доступ запрещен для пользователя {ctx.author.id} (требуется {AUTHORIZED_USER_ID})")
+        await ctx.send("❌ У вас нет прав на использование этой команды.")
+        return
+    
+    # Проверка наличия упоминания пользователя
+    if not member_input:
+        print(f"⚠️ Пользователь не указан в команде")
+        await ctx.send("❌ Укажите пользователя для отправки формы. Использование: `!form @пользователь`")
+        return
+    
+    # Парсим упоминание пользователя
+    member = None
+    
+    # Пытаемся найти пользователя по упоминанию
+    if ctx.message.mentions:
+        member = ctx.message.mentions[0]
+        print(f"🔍 Найден пользователь по упоминанию: {member.id} ({member.display_name})")
+    else:
+        # Пытаемся найти по ID или имени
+        try:
+            # Пытаемся найти по ID
+            if member_input.isdigit():
+                member = ctx.guild.get_member(int(member_input))
+                if member:
+                    print(f"🔍 Найден пользователь по ID: {member.id} ({member.display_name})")
+        except:
+            pass
+        
+        # Если не нашли по ID, пытаемся найти по имени
+        if not member:
+            member = discord.utils.get(ctx.guild.members, name=member_input) or \
+                     discord.utils.get(ctx.guild.members, display_name=member_input) or \
+                     discord.utils.get(ctx.guild.members, nick=member_input)
+            if member:
+                print(f"🔍 Найден пользователь по имени: {member.id} ({member.display_name})")
+    
+    if not member:
+        print(f"❌ Пользователь не найден: {member_input}")
+        await ctx.send(f"❌ Пользователь '{member_input}' не найден на сервере. Используйте упоминание: `!form @пользователь`")
+        return
+    
+    print(f"📤 Попытка отправить форму регистрации пользователю {member.id} ({member.display_name})")
     
     try:
-        # Отправляем сообщение регистрации в личные сообщения пользователя
+        # Создаем embed с формой регистрации
         embed = discord.Embed(
             title="Добро пожаловать на сервер! 🎉",
             description=f"Привет, {member.name}!\n\nДля получения доступа к серверу необходимо зарегистрироваться в клане.\nНажмите кнопку **Логин** ниже, чтобы заполнить форму регистрации.",
@@ -201,459 +204,180 @@ async def on_member_join(member):
         )
         
         view = RegistrationView()
-        await member.send(embed=embed, view=view)
-    except discord.Forbidden:
-        # Если у пользователя закрыты личные сообщения, отправляем в канал с упоминанием
-        channel = bot.get_channel(1183130293545222205)
-        if channel:
-            embed = discord.Embed(
-                title="Добро пожаловать на сервер! 🎉",
-                description=f"Привет, {member.mention}!\n\nДля получения доступа к серверу необходимо зарегистрироваться в клане.\nНажмите кнопку **Логин** ниже, чтобы заполнить форму регистрации.",
-                color=discord.Color.blue()
-            )
-            embed.add_field(
-                name="Информация",
-                value="После заполнения формы бот проверит наличие вашего игрока в клане и выдаст соответствующую роль.",
-                inline=False
-            )
-            embed.add_field(
-                name="⚠️ Внимание",
-                value="Рекомендуется открыть личные сообщения от участников сервера, чтобы получать важные уведомления.",
-                inline=False
-            )
-            
-            view = RegistrationView()
-            await channel.send(embed=embed, view=view)
-        else:
-            print("Канал для регистрации не найден.")
-    except Exception as e:
-        print(f"❌ Ошибка при отправке сообщения регистрации пользователю {member.id}: {e}")
-
-@bot.event
-async def on_message(message):
-    """Обработчик сообщений - отвечает на упоминания бота"""
-    # Пропускаем сообщения от бота
-    if message.author == bot.user:
-        return
-    
-    # Обрабатываем команды в первую очередь
-    if message.content.startswith(bot.command_prefix):
-        await bot.process_commands(message)
-        return
-    
-    # Проверяем, упомянут ли бот в сообщении
-    bot_mentioned = bot.user in message.mentions
-    
-    if bot_mentioned and AI_ENABLED:
+        
+        # Пытаемся отправить в личные сообщения
         try:
-            # Убираем упоминание бота из текста для более чистого запроса
-            content = message.content
-            # Удаляем все упоминания бота
-            for mention in message.mentions:
-                content = content.replace(f"<@{mention.id}>", "").replace(f"<@!{mention.id}>", "")
-            content = content.strip()
-            
-            # Если после удаления упоминаний остался только пустой текст, используем исходное сообщение
-            if not content:
-                content = message.content
-            
-            # Импортируем функцию чата
-            from modules.ai_chat import chat
-            
-            print(f"💬 Обработка сообщения с упоминанием бота от {message.author.display_name}")
-            print(f"   Содержимое: {content[:100]}...")
-            
-            # Отправляем запрос в AI с агрессивным характером
-            response = await chat(
-                message=content,
-                provider=AI_PROVIDER,
-                system_prompt=AI_SYSTEM_PROMPT
+            await member.send(embed=embed, view=view)
+            await ctx.send(f"✅ Форма регистрации отправлена пользователю {member.mention} в личные сообщения.")
+            print(f"✅ Форма регистрации успешно отправлена пользователю {member.display_name} ({member.id}) через команду !form")
+        except discord.Forbidden:
+            # Если DM закрыты, отправляем в канал с упоминанием
+            print(f"⚠️ Личные сообщения закрыты для пользователя {member.display_name}, отправляем в канал")
+            await ctx.send(
+                f"{member.mention}, привет! Я не смог отправить тебе сообщение в личку. "
+                f"Пожалуйста, открой личные сообщения, чтобы пройти регистрацию.",
+                embed=embed, view=view
             )
-            
-            if response:
-                # Ограничиваем длину ответа для Discord
-                if len(response) > 2000:
-                    response = response[:1997] + "..."
-                
-                print(f"✅ Отправка ответа AI пользователю {message.author.display_name}")
-                # Отправляем ответ
-                await message.channel.send(response)
-            else:
-                print(f"⚠️ AI не вернул ответ для пользователя {message.author.display_name}")
-                # Если AI не ответил, можно отправить дефолтный ответ или ничего не делать
-                pass
-                
+            print(f"⚠️ Форма регистрации отправлена в канал {ctx.channel.name} для {member.display_name} (DM закрыты)")
         except Exception as e:
-            print(f"❌ Ошибка при обработке сообщения с упоминанием бота: {e}")
+            print(f"❌ Ошибка при отправке формы регистрации пользователю {member.id}: {e}")
             import traceback
             traceback.print_exc()
-    
-    # Команды уже обработаны выше, не нужно вызывать process_commands повторно
-
-
-@bot.event
-async def on_voice_state_update(member, before, after):
-    user_id = member.id
-    now = datetime.now(timezone.utc).timestamp()
-    try:
-        # --- Выход или переход: удаляем старую карточку ---
-        if before.channel and (not after.channel or before.channel.id != after.channel.id):
-            # Сбрасываем права участника при выходе из созданного канала
-            if before.channel.id in created_channels:
-                owner_id = created_channels[before.channel.id]
-                # Если выходящий не владелец, сбрасываем его права
-                if user_id != owner_id:
-                    member_overwrite = before.channel.overwrites_for(member)
-                    member_overwrite.manage_channels = False
-                    member_overwrite.move_members = False
-                    member_overwrite.mute_members = False
-                    member_overwrite.deafen_members = False
-                    try:
-                        await before.channel.set_permissions(member, overwrite=member_overwrite)
-                    except Exception as e:
-                        print(f"❌ Ошибка при сбросе прав участника: {e}")
-            
-            msg = voice_stat_messages.pop(user_id, None)
-            if msg:
-                try:
-                    await msg.delete()
-                except discord.NotFound:
-                    pass
-            pending_stats.discard(user_id)
-
-        # --- Заход или переход: создаём новую карточку ---
-        if after.channel and (not before.channel or before.channel.id != after.channel.id):
-            # Проверяем и сбрасываем права при входе в созданный канал
-            if after.channel.id in created_channels:
-                owner_id = created_channels[after.channel.id]
-                await reset_channel_permissions(after.channel, owner_id)
-            
-            if after.channel.id not in BLACKLISTED_CHANNELS and after.channel.name not in TRIGGER_CHANNELS:
-                if user_id not in pending_stats:
-                    await enqueue_stat(member, after.channel)
-        
-    except Exception as e:
-        print(f"❌ Ошибка при обновлении статистики: {e}")
-        
-    try:
-        if after.channel and not before.channel:
-            if after.channel.id in BLACKLISTED_CHANNELS:
-                return
-
-            # Пользователь зашёл в голосовой — добавляем сессию
-            response = supabase.table("voice_sessions").insert({
-                "user_id": user_id,
-                "start_time": now
-            }).execute()
-
-        elif before.channel and not after.channel:
-            if before.channel.id in BLACKLISTED_CHANNELS:
-                return
-            # Пользователь вышел из голосового — получаем время старта
-            row = supabase.table("voice_sessions").select("start_time").eq("user_id", user_id).limit(1).execute()
-
-            if not row.data:
-                print(f"❌ Не найдена сессия для пользователя {user_id}")
-                return
-
-            start_time = row.data[0]["start_time"]
-            duration = int(now - start_time)
-
-            # Удаляем сессию
-            del_resp = supabase.table("voice_sessions").delete().eq("user_id", user_id).execute()
-            if not del_resp.data:
-                print(f"❌ Ошибка при удалении сессии")
-
-            # Обновляем/вставляем время в voice_time
-            time_row = supabase.table("voice_time").select("*").eq("user_id", user_id).limit(1).execute()
-            if time_row.data:
-                total_seconds_week = time_row.data[0]["total_seconds"] + duration
-                total_seconds_all_time = time_row.data[0].get("total_seconds_all_time", 0) + duration
-
-                supabase.table("voice_time").update({
-                    "total_seconds": total_seconds_week,
-                    "total_seconds_all_time": total_seconds_all_time
-                }).eq("user_id", user_id).execute()
-            else:
-                supabase.table("voice_time").insert({
-                    "user_id": user_id,
-                    "total_seconds": duration,
-                    "total_seconds_all_time": duration
-                }).execute()
-
-    except Exception as e:
-        print(f"❌ Общая ошибка при обновлении статистики: {e}")
-
-    # Оставляем остальную часть кода без изменений
-    if before.channel and before.channel.id in created_channels:
-        await asyncio.sleep(1)
-        lock = await get_channel_lock(before.channel.id)
-        async with lock:
-            owner_id = created_channels[before.channel.id]
-            members = before.channel.members
-
-            if len(members) == 0:
-                await before.channel.delete()
-                created_channels.pop(before.channel.id, None)
-                channel_bases.pop(before.channel.id, None)
-                setup_messages.pop(before.channel.id, None)
-                print(f"Удалён пустой канал: {before.channel.name}")
-                room_modes.pop(before.channel.id, None)
-                return
-
-            if member.id == owner_id:
-                new_owner = random.choice(members)
-                created_channels[before.channel.id] = new_owner.id
-                old_msg = setup_messages.get(before.channel.id)
-                if old_msg:
-                    try:
-                        await old_msg.edit(
-                            content=(
-                                f"Владелец комнаты вышел. Новый владелец: {new_owner.mention}\n"
-                                f"{new_owner.mention}, настройте комнату:"
-                            )
-                        )
-                        print("✅ Старое сообщение успешно обновлено.")
-                    except discord.NotFound:
-                        # Если вдруг сообщения нет, создаём новое
-                        new_msg = await before.channel.send(
-                            f"Владелец комнаты вышел. Новый владелец: {new_owner.mention}\n"
-                            f"{new_owner.mention}, настройте комнату:"
-                        )
-                        setup_messages[before.channel.id] = new_msg
-                        print("⚠️ Старое сообщение не найдено, создано новое.")
-                    except Exception as e:
-                        print(f"❌ Ошибка при редактировании сообщения: {e}")
-
-                # Сбрасываем права для всех участников и устанавливаем права только для нового владельца
-                await reset_channel_permissions(before.channel, new_owner.id)
-
-                mode = room_modes.get(before.channel.id, "default")
-                view = RoomSetupView(new_owner.id, before.channel.id, mode)
-                # Привязываем view к старому/новому сообщению
-                if old_msg:
-                    await old_msg.edit(view=view)
-                else:
-                    setup_messages[before.channel.id] = new_msg
-
-    if not after.channel or after.channel.name not in TRIGGER_CHANNELS:
-        return
-
-    if after.channel and after.channel.name in TRIGGER_CHANNELS:
-        conf = TRIGGER_CHANNELS[after.channel.name]
-        guild = member.guild
-        category = discord.utils.get(guild.categories, name=conf["category"])
-        if not category:
-            print(f"Категория {conf['category']} не найдена!")
-            return
-
-        existing = [
-            ch for ch in guild.voice_channels
-            if ch.name.startswith(conf["base"]) and ch.category == category
-        ]
-        number = 1
-        base_name = conf["base"]
-        new_name = f"{base_name} #{number}"
-        while any(ch.name == new_name for ch in existing):
-            number += 1
-            new_name = f"{base_name} #{number}"
-
-        new_channel = await guild.create_voice_channel(new_name, category=category, rtc_region="rotterdam")
-
-        await member.move_to(new_channel)
-        
-        # Устанавливаем права только для создателя канала и сбрасываем для всех остальных
-        await reset_channel_permissions(new_channel, member.id)
-        
-        await enqueue_stat(member, new_channel)
-        
-        created_channels[new_channel.id] = member.id
-        channel_bases[new_channel.id] = base_name
-
-        mode = "custom" if conf["category"] == "Кастомки🔴" else "default"
-        room_modes[new_channel.id] = mode
-        view = RoomSetupView(member.id, new_channel.id, mode)
-        msg = await new_channel.send(f"{member.mention}, настройте комнату:", view=view)
-        setup_messages[new_channel.id] = msg
-
-async def check_and_cleanup_left_users():
-    """Проверяет всех пользователей в базе и удаляет данные тех, кто покинул сервер"""
-    try:
-        guilds = bot.guilds
-        if not guilds:
-            print("⚠️ Бот не подключен ни к одному серверу")
-            return
-        
-        # Используем основной сервер по ID
-        guild = discord.utils.get(guilds, id=MAIN_GUILD_ID) or guilds[0]
-        
-        # Получаем всех пользователей из базы
-        all_user_ids = set()
-        
-        # Из user_registrations
-        try:
-            registrations = supabase.table("user_registrations").select("discord_id").execute()
-            if registrations.data:
-                for reg in registrations.data:
-                    discord_id = reg.get("discord_id")
-                    if discord_id:
-                        all_user_ids.add(int(discord_id))
-        except Exception as e:
-            print(f"⚠️ Ошибка при получении user_registrations: {e}")
-        
-        # Из voice_time
-        try:
-            voice_time_users = supabase.table("voice_time").select("user_id").execute()
-            if voice_time_users.data:
-                for vt in voice_time_users.data:
-                    all_user_ids.add(int(vt.get("user_id")))
-        except Exception as e:
-            print(f"⚠️ Ошибка при получении voice_time: {e}")
-        
-        # Из user_levels
-        try:
-            level_users = supabase.table("user_levels").select("user_id").execute()
-            if level_users.data:
-                for lu in level_users.data:
-                    all_user_ids.add(int(lu.get("user_id")))
-        except Exception as e:
-            print(f"⚠️ Ошибка при получении user_levels: {e}")
-        
-        # Проверяем каждого пользователя
-        cleaned_count = 0
-        for user_id in all_user_ids:
-            try:
-                member = guild.get_member(user_id)
-                if not member:
-                    # Пользователь не на сервере - удаляем данные
-                    if await cleanup_user_data(user_id, guild):
-                        cleaned_count += 1
-            except Exception as e:
-                print(f"⚠️ Ошибка при проверке пользователя {user_id}: {e}")
-        
-        if cleaned_count > 0:
-            print(f"🧹 Очищены данные {cleaned_count} пользователей, которые покинули сервер")
-        else:
-            print(f"✅ Все пользователи в базе присутствуют на сервере")
+            await ctx.send(f"❌ Ошибка при отправке формы регистрации: {e}")
             
     except Exception as e:
-        print(f"❌ Ошибка при проверке пользователей на сервере: {e}")
+        print(f"❌ Критическая ошибка в команде form: {e}")
         import traceback
         traceback.print_exc()
+        await ctx.send(f"❌ Произошла ошибка: {e}")
 
-async def clan_verification_check():
-    """Проверяет всех участников с ролью клана каждые 3 часа"""
-    from modules.registration import check_all_members_in_clan
+@bot.command()
+async def rebind(ctx, nickname: str = None):
+    """Перепривязка аккаунта PUBG к вашему аккаунту Discord"""
+    from modules.registration import get_player_info, CLAN_ROLE_ID
     
-    while True:
-        await asyncio.sleep(10800)  # 3 часа = 10800 секунд
+    if not nickname:
+        await ctx.send("❌ Укажите ваш ник в PUBG. Использование: `!rebind ваш_ник`")
+        return
+    
+    await ctx.send("⏳ Проверяю данные...")
+    
+    # Получаем информацию об игроке по нику (player_id, актуальный ник, статус в клане)
+    player_id, current_nickname, is_in_clan = await get_player_info(nickname)
+    
+    if not player_id:
+        await ctx.send(f"❌ Игрок с ником '{nickname}' не найден в PUBG. Проверьте правильность написания ника.")
+        return
+    
+    # Проверяем, не привязан ли уже этот player_id к другому Discord аккаунту
+    existing_registration = supabase.table("user_registrations").select("*").eq("player_id", player_id).execute()
+    if existing_registration.data:
+        existing_discord_id = existing_registration.data[0].get("discord_id")
+        if str(existing_discord_id) != str(ctx.author.id):
+            existing_nickname = existing_registration.data[0].get("pubg_nickname", nickname)
+            await ctx.send(
+                f"❌ Игрок с ником '{existing_nickname}' (player_id: {player_id}) уже привязан к другому аккаунту Discord. "
+                f"Если это ваш аккаунт, обратитесь к администратору."
+            )
+            return
+    
+    # Получаем текущую регистрацию пользователя
+    user_registration = supabase.table("user_registrations").select("*").eq("discord_id", ctx.author.id).execute()
+    
+    if not user_registration.data:
+        await ctx.send(
+            "❌ Вы не зарегистрированы. Используйте команду регистрации через форму или обратитесь к администратору."
+        )
+        return
+    
+    registration_data = user_registration.data[0]
+    registration_name = registration_data.get("name", "")
+    
+    if not is_in_clan:
+        await ctx.send(
+            f"❌ Игрок с ником '{current_nickname if current_nickname else nickname}' не состоит в клане. "
+            f"Привязка не выполнена. Если вы только что вступили в клан, подождите несколько минут и попробуйте снова."
+        )
+        return
+    
+    # Обновляем привязку player_id к discord_id
+    try:
+        actual_nickname = current_nickname if current_nickname else nickname
         
+        supabase.table("user_registrations").update({
+            "player_id": player_id,
+            "pubg_nickname": actual_nickname,
+            "verified": True
+        }).eq("discord_id", ctx.author.id).execute()
+        
+        # Обновляем никнейм в Discord
+        new_nickname = f"{actual_nickname} ({registration_name})"
         try:
-            # Получаем основную гильдию по ID
-            guilds = bot.guilds
-            if guilds:
-                guild = discord.utils.get(guilds, id=MAIN_GUILD_ID) or guilds[0]
-                print(f"🔄 Запуск проверки участников клана на сервере {guild.id}...")
-                await check_all_members_in_clan(guild)
-                
-                # Также проверяем и очищаем данные пользователей, которые покинули сервер
-                print(f"🧹 Проверка пользователей на наличие на сервере...")
-                await check_and_cleanup_left_users()
+            await ctx.author.edit(nick=new_nickname)
+        except discord.Forbidden:
+            await ctx.send(f"⚠️ Не удалось изменить никнейм (нет прав). Пожалуйста, измените его вручную на: {new_nickname}")
+        except Exception as e:
+            print(f"❌ Ошибка при изменении никнейма: {e}")
+        
+        # Обновляем роль - читаем значение заново из переменной окружения
+        from modules.registration import get_clan_role_id
+        current_role_id = get_clan_role_id()
+        role = ctx.guild.get_role(current_role_id)
+        if role:
+            if role not in ctx.author.roles:
+                await ctx.author.add_roles(role)
+                await ctx.send(
+                    f"✅ Аккаунт успешно перепривязан! Актуальный ник: **{actual_nickname}**. "
+                    f"Вам выдана роль клана. Никнейм обновлен на: **{new_nickname}**"
+                )
             else:
-                print("⚠️ Бот не подключен ни к одному серверу")
-        except Exception as e:
-            print(f"❌ Ошибка в задаче проверки клана: {e}")
-            import traceback
-            traceback.print_exc()
+                await ctx.send(
+                    f"✅ Аккаунт успешно перепривязан! Актуальный ник: **{actual_nickname}**. "
+                    f"Никнейм обновлен на: **{new_nickname}**"
+                )
+        else:
+            await ctx.send(f"✅ Аккаунт успешно перепривязан! Актуальный ник: **{actual_nickname}**")
+        
+    except Exception as e:
+        await ctx.send(f"❌ Ошибка при перепривязке аккаунта: {e}")
+        print(f"❌ Ошибка при перепривязке аккаунта для {ctx.author.id}: {e}")
 
-async def weekly_reset():
-    while True:
-        now = datetime.now(timezone.utc)
-        days_until_wednesday = (2 - now.weekday() + 7) % 7
-        if days_until_wednesday == 0:
-            days_until_wednesday = 7
-        next_reset_date = (now + timedelta(days=days_until_wednesday)).date()
-        next_reset = datetime.combine(next_reset_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-        wait_time = (next_reset - now).total_seconds()
-        print(f"⏳ Ожидание до следующей среды: {wait_time // 3600:.0f}ч {(wait_time % 3600) // 60:.0f}м")
-        await asyncio.sleep(wait_time)
 
-        try:
-            print("🔄 Запуск еженедельного сброса...")
-            row = supabase.table("weekly_voice_stats").select("cycle_number").order("cycle_number", desc=True).limit(1).execute()
-            cycle_number = row.data[0]["cycle_number"] if row.data else 0
-            week_data = supabase.table("weekly_voice_stats").select("week_number").eq("cycle_number", cycle_number).order("week_number", desc=True).limit(1).execute()
-            max_week_number = week_data.data[0]["week_number"] if week_data.data else 0
-            if max_week_number >= 12:
-                cycle_number += 1
-                max_week_number = 0
-
-            voice_time_rows = supabase.table("voice_time").select("user_id", "total_seconds").execute()
-
-            user_times = []
-            # Получаем всех пользователей, которые когда-либо были в голосовых каналах
-            all_users_with_stats = supabase.table("weekly_voice_stats").select("user_id").execute()
-            all_user_ids = set()
-            if all_users_with_stats.data:
-                all_user_ids = {record["user_id"] for record in all_users_with_stats.data}
+@bot.command(name="chat", aliases=["ai", "ask"])
+async def chat_command(ctx, *, message: str = None):
+    """Чат с языковой моделью через внешний API
+    
+    Использование: !chat ваш вопрос
+    Пример: !chat Что такое PUBG?
+    """
+    if not message:
+        await ctx.send("❌ Укажите ваш вопрос. Использование: `!chat ваш вопрос`")
+        return
+    
+    # Отправляем сообщение о загрузке
+    loading_msg = await ctx.send("🤔 Думаю...")
+    
+    try:
+        # Проверяем, включен ли AI
+        if not AI_ENABLED:
+            await loading_msg.edit(content="❌ AI чат отключен. Включите его через переменную окружения AI_ENABLED=true")
+            return
+        
+        # Получаем ответ от AI
+        response = await chat(
+            message=message,
+            provider=AI_PROVIDER,
+            system_prompt=AI_SYSTEM_PROMPT
+        )
+        
+        if response:
+            # Удаляем сообщение о загрузке
+            await loading_msg.delete()
             
-            # Добавляем пользователей из текущей недели
-            for record in voice_time_rows.data:
-                user_id = record["user_id"]
-                total_seconds = record["total_seconds"]
-                all_user_ids.add(user_id)
-                user_times.append((user_id, total_seconds))
-
-            # Сортируем по времени (только тех, кто был активен на этой неделе)
-            user_times.sort(key=lambda x: x[1], reverse=True)
-
-            # Начисление опыта только для активных пользователей
-            for i, (user_id, total_seconds) in enumerate(user_times):
-                if total_seconds < 60:  # меньше минуты - без опыта
-                    continue
-
-                if i == 0:
-                    exp = 10
-                elif i in [1, 2]:
-                    exp = 8
-                elif 3 <= i <= 6:
-                    exp = 6
-                elif 7 <= i <= 9:
-                    exp = 4
-                else:
-                    exp = 2
-
-                # Обновляем опыт
-                update_experience(user_id, exp)
-
-                # Сохраняем статистику
-                supabase.table("weekly_voice_stats").insert({
-                    "cycle_number": cycle_number,
-                    "week_number": max_week_number + 1,
-                    "user_id": user_id,
-                    "total_seconds": total_seconds
-                }).execute()
-
-            # Сохраняем записи с 0 часов для всех пользователей, которые были активны ранее, но не на этой неделе
-            for user_id in all_user_ids:
-                # Проверяем, есть ли уже запись для этого пользователя на этой неделе
-                existing_week = supabase.table("weekly_voice_stats").select("*").eq("user_id", user_id).eq("cycle_number", cycle_number).eq("week_number", max_week_number + 1).execute()
-                if not existing_week.data:
-                    # Создаем запись с 0 часов для правильного расчета среднего
-                    supabase.table("weekly_voice_stats").insert({
-                        "cycle_number": cycle_number,
-                        "week_number": max_week_number + 1,
-                        "user_id": user_id,
-                        "total_seconds": 0
-                    }).execute()
-
-            # Обнуляем voice_time только для пользователей, у которых есть записи
-            for record in voice_time_rows.data:
-                user_id = record["user_id"]
-                supabase.table("voice_time").update({"total_seconds": 0}).eq("user_id", user_id).execute()
-
-            print("📅 Статистика по времени в голосовых сброшена!")
-
-        except Exception as e:
-            print(f"❌ Ошибка при сбросе статистики: {e}")
+            # Отправляем ответ (ограничиваем длину для Discord)
+            if len(response) > 2000:
+                response = response[:1997] + "..."
+            
+            embed = discord.Embed(
+                title="🤖 Ответ AI",
+                description=response,
+                color=discord.Color.blue()
+            )
+            embed.set_footer(text=f"Запрос от {ctx.author.display_name}")
+            
+            await ctx.send(embed=embed)
+        else:
+            error_msg = (
+                "❌ Не удалось получить ответ от AI.\n\n"
+                "**Возможные причины:**\n"
+                "• API ключ не установлен или неверный\n"
+                "• Превышен лимит запросов (rate limit)\n"
+                "• Проблемы с сетью\n\n"
+                "Проверьте логи на Koyeb для подробностей."
+            )
+            await loading_msg.edit(content=error_msg)
+            
+    except Exception as e:
+        await loading_msg.edit(content=f"❌ Ошибка при обращении к AI: {e}")
+        print(f"❌ Ошибка в команде chat: {e}")
 
