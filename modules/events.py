@@ -260,6 +260,9 @@ async def on_message(message):
             # Импортируем функцию чата
             from modules.ai_chat import chat
             
+            print(f"💬 Обработка сообщения с упоминанием бота от {message.author.display_name}")
+            print(f"   Содержимое: {content[:100]}...")
+            
             # Отправляем запрос в AI с агрессивным характером
             response = await chat(
                 message=content,
@@ -272,9 +275,11 @@ async def on_message(message):
                 if len(response) > 2000:
                     response = response[:1997] + "..."
                 
+                print(f"✅ Отправка ответа AI пользователю {message.author.display_name}")
                 # Отправляем ответ
                 await message.channel.send(response)
             else:
+                print(f"⚠️ AI не вернул ответ для пользователя {message.author.display_name}")
                 # Если AI не ответил, можно отправить дефолтный ответ или ничего не делать
                 pass
                 
