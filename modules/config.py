@@ -8,6 +8,7 @@ PUBG_API_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJjZmMyNDMyMC01NzZ
 PUBG_PLATFORM = "steam"
 # print("PUBG API key:", repr(PUBG_API_KEY))  # Отключено для безопасности
 
+
 # Discord Intents
 intents = discord.Intents.default()
 intents.guilds = True
@@ -65,5 +66,6 @@ AI_ENABLED = os.getenv("AI_ENABLED", "true").lower() == "true"  # Включен
 #     subprocess.run(["chmod", "+x", "./ffmpeg"], check=False, timeout=1)
 # except:
 #     pass  # Игнорируем ошибку
+
 
 
