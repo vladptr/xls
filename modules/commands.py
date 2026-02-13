@@ -3,28 +3,32 @@ from discord.ext import commands
 from modules.config import bot, AUTHORIZED_USER_ID, AI_SYSTEM_PROMPT, AI_PROVIDER, AI_ENABLED
 from modules.database import supabase
 from modules.leveling import update_experience
-from modules.pubg_stats import stat as pubg_stat
-from modules.leaderboard import leaderboard as leaderboard_func
 from modules.registration import RegistrationView, REGISTRATION_CHANNEL_ID
 from modules.ai_chat import chat
 
-@bot.command(name="clearmsg")
-@commands.has_permissions(manage_messages=False)
-async def clear_bot_messages(ctx):
-    """Удаляет все сообщения от бота в текущем канале."""
-    deleted = 0
-    async for message in ctx.channel.history(limit=1000):  # Увеличь лимит при необходимости
-        if message.author == bot.user:
-            try:
-                await message.delete()
-                deleted += 1
-            except discord.Forbidden:
-                await ctx.send("❌ У меня нет прав на удаление сообщений.")
-                return
-            except discord.HTTPException:
-                continue  # Иногда Discord не позволяет удалить старые сообщения
+# Импортируем команды из других модулей
+from modules.pubg_stats import stat as pubg_stat
+from modules.leaderboard import leaderboard as leaderboard_func
 
-    await ctx.send(f"🧹 Удалено {deleted} сообщений от бота.", delete_after=5)
+# Проверяем, не зарегистрирована ли команда уже
+if bot.get_command("clearmsg") is None:
+    @bot.command(name="clearmsg")
+    @commands.has_permissions(manage_messages=False)
+    async def clear_bot_messages(ctx):
+        """Удаляет все сообщения от бота в текущем канале."""
+        deleted = 0
+        async for message in ctx.channel.history(limit=1000):  # Увеличь лимит при необходимости
+            if message.author == bot.user:
+                try:
+                    await message.delete()
+                    deleted += 1
+                except discord.Forbidden:
+                    await ctx.send("❌ У меня нет прав на удаление сообщений.")
+                    return
+                except discord.HTTPException:
+                    continue  # Иногда Discord не позволяет удалить старые сообщения
+
+        await ctx.send(f"🧹 Удалено {deleted} сообщений от бота.", delete_after=5)
 
 @bot.command()
 async def gonki(ctx):
@@ -367,7 +371,15 @@ async def chat_command(ctx, *, message: str = None):
             
             await ctx.send(embed=embed)
         else:
-            await loading_msg.edit(content="❌ Не удалось получить ответ от AI. Проверьте настройки API ключей.")
+            error_msg = (
+                "❌ Не удалось получить ответ от AI.\n\n"
+                "**Возможные причины:**\n"
+                "• API ключ не установлен или неверный\n"
+                "• Превышен лимит запросов (rate limit)\n"
+                "• Проблемы с сетью\n\n"
+                "Проверьте логи на Koyeb для подробностей."
+            )
+            await loading_msg.edit(content=error_msg)
             
     except Exception as e:
         await loading_msg.edit(content=f"❌ Ошибка при обращении к AI: {e}")
