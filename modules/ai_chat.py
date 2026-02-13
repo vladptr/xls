@@ -48,6 +48,10 @@ async def chat_with_groq(
         print("⚠️ GROQ_API_KEY не установлен. Получите ключ на https://console.groq.com/")
         return None
     
+    # Проверяем формат ключа
+    if not api_key.startswith("gsk_"):
+        print(f"⚠️ Предупреждение: GROQ_API_KEY не начинается с 'gsk_'. Проверьте правильность ключа.")
+    
     model_name = GROQ_MODELS.get(model, GROQ_MODELS["llama"])
     
     headers = {
@@ -66,6 +70,11 @@ async def chat_with_groq(
     }
     
     try:
+        print(f"🔍 Отправка запроса в Groq API...")
+        print(f"   Модель: {model_name}")
+        print(f"   Длина сообщения: {len(message)} символов")
+        print(f"   Ключ API: {api_key[:10]}...{api_key[-5:] if len(api_key) > 15 else '***'}")
+        
         # Используем requests в отдельном потоке для асинхронности
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
@@ -73,15 +82,41 @@ async def chat_with_groq(
             lambda: requests.post(GROQ_API_URL, json=data, headers=headers, timeout=30)
         )
         
+        print(f"📡 Ответ от Groq API: статус {response.status_code}")
+        
         if response.status_code == 200:
             result = response.json()
-            return result["choices"][0]["message"]["content"]
+            if "choices" in result and len(result["choices"]) > 0:
+                answer = result["choices"][0]["message"]["content"]
+                print(f"✅ Получен ответ от AI (длина: {len(answer)} символов)")
+                return answer
+            else:
+                print(f"❌ Неожиданный формат ответа от Groq API: {result}")
+                return None
+        elif response.status_code == 401:
+            print(f"❌ Ошибка авторизации Groq API (401): Неверный API ключ")
+            print(f"   Проверьте правильность GROQ_API_KEY на Koyeb")
+            return None
+        elif response.status_code == 429:
+            print(f"❌ Rate limit Groq API (429): Превышен лимит запросов")
+            print(f"   Подождите минуту и попробуйте снова")
+            return None
         else:
-            print(f"❌ Ошибка Groq API: {response.status_code} - {response.text}")
+            print(f"❌ Ошибка Groq API: {response.status_code}")
+            print(f"   Ответ: {response.text[:500]}")
             return None
             
+    except Timeout:
+        print(f"❌ Таймаут при запросе к Groq API (30 секунд)")
+        return None
+    except RequestException as e:
+        print(f"❌ Ошибка сети при запросе к Groq API: {e}")
+        return None
     except Exception as e:
-        print(f"❌ Ошибка при запросе к Groq API: {e}")
+        print(f"❌ Неожиданная ошибка при запросе к Groq API: {type(e).__name__}")
+        print(f"   Сообщение: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
