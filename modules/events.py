@@ -42,7 +42,7 @@ async def reset_channel_permissions(channel, owner_id):
         if owner:
             owner_overwrite = channel.overwrites_for(owner)
             owner_overwrite.manage_channels = True
-            owner_overwrite.move_members = True
+            owner_overwrite.move_members = False
             owner_overwrite.connect = True
             await channel.set_permissions(owner, overwrite=owner_overwrite)
         
@@ -424,4 +424,5 @@ async def weekly_reset():
 
         except Exception as e:
             print(f"❌ Ошибка при сбросе статистики: {e}")
+
 
