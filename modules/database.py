@@ -18,7 +18,18 @@ def get_connection():
 # НЕ инициализируем при импорте - это может блокировать запуск
 # Инициализация будет происходить через init_db() при запуске бота
 supabase = None
-print("💾 Supabase будет инициализирован через init_db() при запуске")
+
+def get_supabase():
+    """Получает экземпляр supabase, инициализируя его если нужно"""
+    global supabase
+    if supabase is None:
+        try:
+            supabase = get_connection()
+            print("✅ Supabase инициализирован через get_supabase()")
+        except Exception as e:
+            print(f"⚠️ Ошибка при инициализации Supabase через get_supabase(): {e}")
+            return None
+    return supabase
 
 def init_db():
     global supabase
