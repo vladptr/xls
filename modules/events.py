@@ -16,8 +16,46 @@ voice_stat_messages = {}
 
 ADMIN_USER_ID = 455023858463014922
 
+# Кэш для отслеживания последнего вызова reset_channel_permissions (защита от частых вызовов)
+_last_permission_reset = {}
+_reset_lock = asyncio.Lock()
+
 async def reset_channel_permissions(channel, owner_id):
     """Сбрасывает права для всех участников канала, кроме владельца и администратора"""
+    # Защита от частых вызовов - не чаще раза в 2 секунды для одного канала
+    async with _reset_lock:
+        channel_key = f"{channel.id}_{owner_id}"
+        current_time = asyncio.get_event_loop().time()
+        
+        if channel_key in _last_permission_reset:
+            time_since_last = current_time - _last_permission_reset[channel_key]
+            if time_since_last < 2.0:  # Минимум 2 секунды между вызовами
+                await asyncio.sleep(2.0 - time_since_last)
+        
+        _last_permission_reset[channel_key] = asyncio.get_event_loop().time()
+    
+    async def safe_set_permissions(target, overwrite, delay=0.1):
+        """Безопасная установка прав с обработкой rate limits"""
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                await channel.set_permissions(target, overwrite=overwrite)
+                await asyncio.sleep(delay)  # Задержка между запросами
+                return True
+            except discord.errors.HTTPException as e:
+                if e.status == 429:
+                    retry_after = getattr(e, 'retry_after', 1.0)
+                    print(f"⚠️ Rate limit при установке прав для {target}. Ожидание {retry_after} секунд...")
+                    await asyncio.sleep(retry_after)
+                    continue
+                else:
+                    print(f"⚠️ Ошибка при установке прав для {target}: {e}")
+                    return False
+            except Exception as e:
+                print(f"⚠️ Ошибка при установке прав для {target}: {e}")
+                return False
+        return False
+    
     try:
         # Убеждаемся, что @everyone не имеет прав на управление каналом
         everyone_overwrite = channel.overwrites_for(channel.guild.default_role)
@@ -25,7 +63,7 @@ async def reset_channel_permissions(channel, owner_id):
         everyone_overwrite.move_members = False
         everyone_overwrite.mute_members = False
         everyone_overwrite.deafen_members = False
-        await channel.set_permissions(channel.guild.default_role, overwrite=everyone_overwrite)
+        await safe_set_permissions(channel.guild.default_role, everyone_overwrite, delay=0.2)
         
         # Сбрасываем права для всех участников канала, кроме владельца и администратора
         for member in channel.members:
@@ -35,7 +73,7 @@ async def reset_channel_permissions(channel, owner_id):
                 member_overwrite.move_members = False
                 member_overwrite.mute_members = False
                 member_overwrite.deafen_members = False
-                await channel.set_permissions(member, overwrite=member_overwrite)
+                await safe_set_permissions(member, member_overwrite, delay=0.2)
         
         # Устанавливаем права для владельца
         owner = channel.guild.get_member(owner_id)
@@ -44,25 +82,20 @@ async def reset_channel_permissions(channel, owner_id):
             for role in owner.roles:
                 if role != channel.guild.default_role:  # Пропускаем @everyone, он уже обработан выше
                     role_overwrite = channel.overwrites_for(role)
-                    role_overwrite.move_members = False  # Явно отключаем отключение участников для ролей
-                    try:
-                        await channel.set_permissions(role, overwrite=role_overwrite)
-                    except Exception as e:
-                        print(f"⚠️ Не удалось установить права для роли {role.name}: {e}")
+                    role_overwrite.move_members = False
+                    await safe_set_permissions(role, role_overwrite, delay=0.2)
             
             # Теперь устанавливаем права для самого владельца
             owner_overwrite = channel.overwrites_for(owner)
-            # Явно устанавливаем все права для владельца
-            owner_overwrite.manage_channels = True   # Управление каналом (включая редактирование доступа по ролям)
-            owner_overwrite.move_members = False     # ЯВНО ОТКЛЮЧЕНО: отключение игроков
-            owner_overwrite.mute_members = False     # Отключено: муты участников
-            owner_overwrite.deafen_members = False   # Отключено: отключение звука участников
-            owner_overwrite.connect = True           # Подключение к каналу
-            owner_overwrite.speak = True             # Возможность говорить
-            owner_overwrite.view_channel = True       # Просмотр канала
+            owner_overwrite.manage_channels = True
+            owner_overwrite.move_members = False
+            owner_overwrite.mute_members = False
+            owner_overwrite.deafen_members = False
+            owner_overwrite.connect = True
+            owner_overwrite.speak = True
+            owner_overwrite.view_channel = True
             
-            # Явно устанавливаем overwrite, чтобы перезаписать любые права от ролей
-            await channel.set_permissions(owner, overwrite=owner_overwrite)
+            await safe_set_permissions(owner, owner_overwrite, delay=0.2)
             
             # Проверяем, что права действительно установлены
             final_overwrite = channel.overwrites_for(owner)
@@ -80,7 +113,7 @@ async def reset_channel_permissions(channel, owner_id):
             admin_overwrite.mute_members = True
             admin_overwrite.deafen_members = True
             admin_overwrite.connect = True
-            await channel.set_permissions(admin, overwrite=admin_overwrite)
+            await safe_set_permissions(admin, admin_overwrite, delay=0.2)
     except Exception as e:
         print(f"❌ Ошибка при сбросе прав канала: {e}")
 
@@ -110,6 +143,13 @@ async def stat_worker():
             if stat_msg:
                 voice_stat_messages[member.id] = stat_msg
             await temp_msg.delete()
+        except discord.errors.HTTPException as e:
+            if e.status == 429:
+                retry_after = getattr(e, 'retry_after', 5.0)
+                print(f"⚠️ Rate limit при отправке статистики. Ожидание {retry_after} секунд...")
+                await asyncio.sleep(retry_after)
+            else:
+                print(f"❌ Ошибка при отправке статистики: {e}")
         except Exception as e:
             print(f"❌ Ошибка при отправке статистики: {e}")
         finally:
