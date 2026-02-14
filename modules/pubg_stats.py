@@ -4,7 +4,7 @@ import re
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from io import BytesIO
 from modules.config import PUBG_API_KEY, PUBG_PLATFORM, bot
-from modules.database import supabase
+from modules.database import get_supabase
 from modules.leveling import calculate_level_from_exp
 
 def get_rank_info(rating):
@@ -105,12 +105,17 @@ async def stat(ctx, member: discord.Member = None):
         score_text = f"{current_rank_point}/{high}" if rank_name != "master" else f"{current_rank_point}+"
                 
         # Получение данных из Supabase
-        row = supabase.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
+        db = get_supabase()
+        if not db:
+            await ctx.send("❌ Ошибка подключения к базе данных. Обратитесь к администратору.")
+            return None
+        
+        row = db.table("user_levels").select("*").eq("user_id", user_id).limit(1).execute()
         stats = row.data[0] if row.data else {"exp": 0, "level": 1}
         level = stats["level"]
         exp = stats["exp"]
 
-        time_row = supabase.table("voice_time").select("total_seconds_all_time").eq("user_id", user_id).limit(1).execute()
+        time_row = db.table("voice_time").select("total_seconds_all_time").eq("user_id", user_id).limit(1).execute()
         if time_row.data and time_row.data[0].get("total_seconds_all_time") is not None:
             total_seconds_all_time = int(time_row.data[0].get("total_seconds_all_time", 0))
         else:
@@ -119,7 +124,7 @@ async def stat(ctx, member: discord.Member = None):
         total_hours = total_seconds_all_time / 3600.0
 
         # Получаем все недели пользователя для правильного расчета среднего
-        weeks_rows = supabase.table("weekly_voice_stats").select("cycle_number,week_number,total_seconds").eq("user_id", user_id).order("cycle_number").order("week_number").execute()
+        weeks_rows = db.table("weekly_voice_stats").select("cycle_number,week_number,total_seconds").eq("user_id", user_id).order("cycle_number").order("week_number").execute()
         
         if not weeks_rows.data:
             avg_hours = 0.0
