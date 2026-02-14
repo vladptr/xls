@@ -474,11 +474,22 @@ async def check_all_members_in_clan(guild: discord.Guild):
                 if is_in_clan:
                     # Игрок в клане - выдаем роль если её нет
                     if not has_role:
-                        await member.add_roles(role)
-                        db.table("user_registrations").update({
-                            "verified": True
-                        }).eq("discord_id", discord_id).execute()
-                        print(f"✅ Выдана роль пользователю {member.display_name} ({current_nickname})")
+                        try:
+                            await member.add_roles(role)
+                            db.table("user_registrations").update({
+                                "verified": True
+                            }).eq("discord_id", discord_id).execute()
+                            print(f"✅ Выдана роль пользователю {member.display_name} ({current_nickname})")
+                            await asyncio.sleep(1)  # Задержка после добавления роли
+                        except discord.errors.HTTPException as e:
+                            if e.status == 429:
+                                retry_after = getattr(e, 'retry_after', 5.0)
+                                print(f"⚠️ Rate limit при выдаче роли. Ожидание {retry_after} секунд...")
+                                await asyncio.sleep(retry_after)
+                            else:
+                                print(f"⚠️ Ошибка при выдаче роли пользователю {member.display_name}: {e}")
+                        except Exception as e:
+                            print(f"⚠️ Ошибка при выдаче роли пользователю {member.display_name}: {e}")
                     
                     # Проверяем, изменился ли ник в игре
                     registration_name = registration.get("name", "")
@@ -496,17 +507,37 @@ async def check_all_members_in_clan(guild: discord.Guild):
                         try:
                             await member.edit(nick=expected_nickname)
                             print(f"📝 Обновлен никнейм в Discord для {member.display_name}: {member.display_name} -> {expected_nickname}")
+                            # Задержка после обновления никнейма для избежания rate limits
+                            await asyncio.sleep(2)
+                        except discord.errors.HTTPException as e:
+                            if e.status == 429:
+                                retry_after = getattr(e, 'retry_after', 5.0)
+                                print(f"⚠️ Rate limit при обновлении никнейма. Ожидание {retry_after} секунд...")
+                                await asyncio.sleep(retry_after)
+                            else:
+                                print(f"⚠️ Не удалось обновить никнейм пользователя {member.display_name}: {e}")
                         except Exception as e:
                             print(f"⚠️ Не удалось обновить никнейм пользователя {member.display_name}: {e}")
                 else:
                     # Игрок не в клане - забираем роль если она есть
                     if has_role:
-                        await member.remove_roles(role)
-                        db.table("user_registrations").update({
-                            "verified": False
-                        }).eq("discord_id", discord_id).execute()
-                        removed_count += 1
-                        print(f"❌ Удалена роль у пользователя {member.display_name} ({current_nickname}) - игрок не найден в клане")
+                        try:
+                            await member.remove_roles(role)
+                            db.table("user_registrations").update({
+                                "verified": False
+                            }).eq("discord_id", discord_id).execute()
+                            removed_count += 1
+                            print(f"❌ Удалена роль у пользователя {member.display_name} ({current_nickname}) - игрок не найден в клане")
+                            await asyncio.sleep(1)  # Задержка после удаления роли
+                        except discord.errors.HTTPException as e:
+                            if e.status == 429:
+                                retry_after = getattr(e, 'retry_after', 5.0)
+                                print(f"⚠️ Rate limit при удалении роли. Ожидание {retry_after} секунд...")
+                                await asyncio.sleep(retry_after)
+                            else:
+                                print(f"⚠️ Ошибка при удалении роли у пользователя {member.display_name}: {e}")
+                        except Exception as e:
+                            print(f"⚠️ Ошибка при удалении роли у пользователя {member.display_name}: {e}")
                 
                 # Добавляем задержку в 1 минуту между проверками участников (кроме последнего)
                 if index < total_registrations - 1:
